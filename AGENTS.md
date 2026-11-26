@@ -24,7 +24,29 @@ Only your pattern's files:
 * `migration/pattern_NN/` (`jobs.csv`, `spec.md`, `components.yml`, `validation.yml`, `validation_results.md`, `talend/`)
 * `tests/patterns/pattern_NN/`
 
-Everything else is shared: `src/operators/`, `tests/static/`, `tests/unit/`, `tests/project.py`, `tests/conftest.py`, `pytest.ini`, `databricks.yml`, `skills/`, `notebooks/validate_pattern`, `AGENTS.md`. Don't edit shared files. If you need a shared change (for example a new operator), stop and describe it - signature, behaviour, tests - for a separate `shared/<topic>` PR.
+Everything else is shared: `src/operators/`, `tests/static/`, `tests/unit/`, `tests/project.py`, `tests/conftest.py`, `pytest.ini`, `databricks.yml`, `skills/`, `notebooks/validate_pattern`, `AGENTS.md`, `.gitignore`, `.github/`. Make shared changes only on a shared branch (below), never on your migration branch, and only when the pattern can't be delivered without them (for example a missing operator). Keep them minimal and add unit tests in `tests/unit/`.
+
+## Git
+
+The repo is `https://github.com/aaronpan811127/talend_migration`, default branch `main`.
+
+Full rules: `skills/talend-pattern-migration/references/conventions.md`, section Git and environments.
+
+1. **Your own clone and branches.** Don't edit the reference Git folder `/Workspace/Users/aaron.pan@databricks.com/talend_migration`, don't use `git worktree`, and don't share a clone with another session. Clone into the sandbox and name your branches after this session:
+   ```
+   git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration && cd ~/talend_migration
+   TS=$(date -u +%Y%m%d-%H%M)              # session start, UTC
+   SESSION=<this session's name, lowercase, non a-z0-9 -> "-", max 40 chars>
+   MIGRATE=migrate/pattern_NN/$TS-$SESSION
+   SHARED=shared/<topic>/$TS-$SESSION     # only if you need a shared change
+   ```
+   Never create or push a plain `migrate/pattern_NN` or `shared/<topic>` branch.
+2. **Shared change first (if needed):** `git switch -c $SHARED origin/main`, commit only shared files (`shared: <what>`), push, then `gh pr create --base main --head $SHARED --title "shared: <topic>" --body-file <filled .github/pull_request_template.md>`.
+3. **Migration branch:** `git switch -c $MIGRATE $SHARED` (or `origin/main` if there is no shared change). Commit small with `pattern_NN: <what>`; stage only your pattern's files, never `git add -A` blindly. Push, then `gh pr create --base $SHARED --head $MIGRATE --title "pattern_NN: <summary>"` (base `main` if no shared branch), with "Stacked on #<shared PR>" at the top of the body.
+4. **Need a shared change later?** Create `$SHARED` from `origin/main` and open its PR, then `git merge $SHARED` into `$MIGRATE` and `gh pr edit <migration PR> --base $SHARED`. Merge, never rebase.
+5. **Before every push** run `pytest tests/static tests/patterns/pattern_NN`. `tests/static/test_git_ownership.py` fails if the migration branch changes anything outside your pattern (compared with the shared branch below it) or if a branch name is wrong.
+6. **Never** push to `main`, force-push, rebase pushed commits, delete other sessions' branches, or approve or merge PRs - a human merges, bottom of the stack first. If `gh` or GitHub credentials are missing, push what you can and report the branch names and the compare URLs (`https://github.com/aaronpan811127/talend_migration/compare/<base>...<head>`).
+7. **Staying current:** `git fetch origin`, then `git merge origin/main` into your top branch (or merge `$SHARED` into `$MIGRATE` after changing it). Resolve conflicts in your pattern's files; stop and report conflicts in shared files you didn't change.
 
 ## Tool mapping (Genie Code -> you)
 
@@ -80,6 +102,7 @@ databricks bundle run <job_key> --target dev --var lane=pattern_NN
 
 Report back:
 
+* your branches, PR URLs and stack order (shared PR -> migration PR), or why you couldn't push or open them;
 * files changed;
 * output of `pytest tests/static tests/patterns/pattern_NN` and `bundle validate`, and the run URLs if you deployed;
 * every `needs_input` / `deferred` component with its reason;

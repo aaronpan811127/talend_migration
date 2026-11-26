@@ -45,13 +45,13 @@ talend_migration/
 
 There is no automatic Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `skills/talend-pattern-migration/references/`. Reusable findings (new operators, new mappings) go back as shared changes.
 
-1. Clone the repo into your own Git folder and create a branch `migrate/pattern_NN`.
+1. Each session (an Omnigent sandbox session, or you in Genie Code) gets its own clone of `https://github.com/aaronpan811127/talend_migration` and its own branches, named after the session: `migrate/pattern_NN/<YYYYMMDD-HHMM>-<session>` and, if shared files must change, `shared/<topic>/<YYYYMMDD-HHMM>-<session>` (UTC). In Omnigent, clone inside the sandbox; in Genie Code, use your own Git folder. No worktrees, and never share a clone.
 2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/skills`. Both skills then load automatically. Other coding agents (Claude Code, Codex, Omnigent sub-agents) read `AGENTS.md`, which points them to the same skills.
 3. Claim your pattern by creating `migration/pattern_NN/jobs.csv` (one file per pattern, so owners never conflict), put the Talend exports in `migration/pattern_NN/talend/`, and ask Genie Code to "migrate pattern_NN".
-4. Only edit your pattern's files. Changes to `src/operators`, `databricks.yml` or `skills/` go in a separate `shared/<topic>` PR. See `skills/talend-pattern-migration/references/conventions.md`.
+4. The migration branch changes only your pattern's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `skills/` or other shared files go on the session's shared branch, and the migration branch is stacked on it. See `skills/talend-pattern-migration/references/conventions.md` (Git and environments).
 5. Run `tests/run_tests` (or `pytest tests/static tests/patterns/pattern_NN`) and fix failures before deploying.
 6. Deploy with `--target dev` only. Each deploy lands in a lane (default `main`) with its own folder, job names and Snowflake schema; parallel agents add `--var lane=pattern_NN`.
-7. Ask Genie Code to "validate pattern_NN", then open a PR when the definition of done is met.
+7. Ask Genie Code to "validate pattern_NN". The agent pushes its branches and opens stacked PRs: the shared PR into `main`, and the migration PR into the shared branch (or into `main` if there's no shared change). A human reviews and merges them, bottom first.
 
 The package is named `operators` rather than `operator` so it doesn't shadow Python's built-in `operator` module.
 
@@ -81,4 +81,4 @@ databricks bundle deploy --target dev --var lane=pattern_01
 databricks bundle run pattern_01_example --target dev --var lane=pattern_01
 ```
 
-Move this folder into a Git folder (repo) before promoting to prod.
+Prod is deployed only from `main`, after PR review.
