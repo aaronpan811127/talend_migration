@@ -1,0 +1,27 @@
+# Reconciliation checks: Talend output (expected) vs Databricks output (actual).
+# Run with notebooks/validate_pattern or operators.run_from_config. See skills/talend-migration-validation.
+# ${snowflake_schema} = the developer's dev shadow schema (MIGRATION_DEV_<short_name>_<lane>), filled in at run time.
+pattern: pattern_01
+snowflake_secret_scope: snowflake-dev
+checks:
+  - name: stg_orders
+    expected:              # produced by Talend
+      type: snowflake      # snowflake | table | files
+      table: PROD_DB.ETL.STG_ORDERS
+    actual:                # produced by the Databricks job in dev
+      type: snowflake
+      table: DEV_DB.${snowflake_schema}.STG_ORDERS
+    keys: [ORDER_ID]
+
+  - name: orders_final     # output of the stored procedure
+    expected:
+      type: snowflake
+      table: PROD_DB.ETL.ORDERS_FINAL
+      filter: "LOAD_DATE = '2026-11-24'"
+    actual:
+      type: snowflake
+      table: DEV_DB.${snowflake_schema}.ORDERS_FINAL
+      filter: "LOAD_DATE = '2026-11-24'"
+    keys: [ORDER_ID]
+    ignore_columns: [LOAD_TS]   # run timestamp, differs by design
+    numeric_tolerance: 0

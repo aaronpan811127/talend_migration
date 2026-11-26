@@ -1,0 +1,58 @@
+# Talend -> Databricks migration bundle
+# Deploy with: databricks bundle deploy --target dev [--var lane=pattern_NN for parallel agents]
+
+bundle:
+  name: talend_migration
+
+include:
+  - resources/jobs/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for Databricks-side tables
+    default: dev_catalog
+  schema:
+    description: Schema for Databricks-side tables
+    default: talend_migration
+  landing_root:
+    description: S3 (or UC Volume) root used as the landing zone
+    default: s3://CHANGE-ME-dev-landing/talend
+  snowflake_secret_scope:
+    description: Secret scope holding Snowflake credentials (keys - account, user, password, role, warehouse, database)
+    default: snowflake-dev
+  lane:
+    description: Dev isolation lane. 'main' for people; parallel agents pass --var lane=pattern_NN (or BUNDLE_VAR_lane) so each gets its own deploy folder, job names and Snowflake schema.
+    default: main
+  snowflake_schema:
+    description: Snowflake schema that unqualified tables are written to. Dev = one shadow schema per developer and lane, so parallel runs don't overwrite each other.
+    default: MIGRATION_DEV_${workspace.current_user.short_name}_${var.lane}
+  notification_email:
+    description: Email notified on job failure
+    default: ${workspace.current_user.userName}
+
+targets:
+  dev:
+    mode: development
+    default: true
+    # One deploy folder, deployment lock and job-name prefix per lane, so parallel agents never collide.
+    workspace:
+      root_path: ~/.bundle/${bundle.name}/${bundle.target}/${var.lane}
+    presets:
+      name_prefix: "[dev ${workspace.current_user.short_name} ${var.lane}] "
+      tags:
+        lane: ${var.lane}
+    # workspace:
+    #   host: https://<dev-workspace>.cloud.databricks.com
+
+  prod:
+    mode: production
+    workspace:
+      # host: https://<prod-workspace>.cloud.databricks.com
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: prod_catalog
+      landing_root: s3://CHANGE-ME-prod-landing/talend
+      snowflake_secret_scope: snowflake-prod
+      snowflake_schema: CHANGE-ME-prod-schema
+    # run_as:
+    #   service_principal_name: <service-principal-application-id>

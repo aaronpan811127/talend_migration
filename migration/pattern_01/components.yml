@@ -1,0 +1,51 @@
+# Status of every Talend component in this pattern. Checked by tests/static/test_components.py.
+# Field reference: skills/talend-pattern-migration/references/conventions.md#component-status-file
+#
+# mapping: standard   - follows a row of references/component-mapping.md
+#          manual     - no standard mapping; hand-written (needs reviewed_by once resolved)
+#          not_needed - no Databricks equivalent required (say why in implementation)
+#          unsupported- no migration path yet (cannot be resolved)
+# status:  resolved | needs_input | deferred   (needs_input / deferred need a reason)
+pattern: pattern_01
+components:
+  - name: tS3Connection_1
+    type: tS3Connection
+    mapping: not_needed
+    implementation: S3 is read through a Unity Catalog external location
+    status: resolved
+
+  - name: tFileInputDelimited_1
+    type: tFileInputDelimited
+    mapping: standard
+    implementation: read_files(spark, source_path, fmt=source_format)
+    notebook: 01_extract_load
+    cell: "Extract: read landed files from S3"
+    status: resolved
+    semantic_deltas:
+      - Column types are inferred as strings; Talend applied its schema types on read.
+
+  - name: tSnowflakeOutputBulkExec_1
+    type: tSnowflakeOutputBulkExec
+    mapping: standard
+    implementation: write_snowflake(df, sf_cfg, table=snowflake_stage_table, mode="overwrite")
+    notebook: 01_extract_load
+    cell: "Load: write to Snowflake staging table"
+    status: needs_input
+    reason: >
+      Spark connector overwrite recreates the table by default, which can drop grants and change
+      column types. Confirm whether Talend truncated the table; if so, pass truncate_table=on.
+
+  - name: tSnowflakeRow_1
+    type: tSnowflakeRow
+    mapping: standard
+    implementation: call_procedure(sf_cfg, snowflake_procedure, [job_name]) - unqualified name, called as <database>.<snowflake_schema>.SP_TRANSFORM_ORDERS
+    notebook: 02_transform
+    cell: "Transform: call Snowflake stored procedure"
+    status: needs_input
+    reason: >
+      Each developer's shadow schema needs its own copy of SP_TRANSFORM_ORDERS, and that copy must read and
+      write unqualified (or CURRENT_SCHEMA()) tables, not ETL.*. Ask the Snowflake owner whether the body
+      hard-codes ETL; if so, provide a parameterised version. Prod: set snowflake_schema to the schema the
+      procedure lives in.
+    semantic_deltas:
+      - Talend called ETL.SP_TRANSFORM_ORDERS by fixed name; the migrated job calls the copy in snowflake_schema.

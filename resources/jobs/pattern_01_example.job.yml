@@ -1,0 +1,51 @@
+# One file per migrated Talend job. Copy this file for each job; tasks run the notebooks in notebooks/<pattern>/.
+resources:
+  jobs:
+    pattern_01_example:
+      name: pattern_01_example
+      tags:
+        source: talend
+        pattern: pattern_01
+        talend_job: ExampleOrdersLoad
+
+      parameters:
+        - name: job_name
+          default: pattern_01_example
+        - name: src_path
+          default: ${workspace.file_path}/src
+        - name: catalog
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
+        - name: snowflake_secret_scope
+          default: ${var.snowflake_secret_scope}
+        - name: snowflake_schema          # dev: MIGRATION_DEV_<your short name>_<lane>
+          default: ${var.snowflake_schema}
+        # Job-specific settings
+        - name: source_path
+          default: ${var.landing_root}/example/orders/
+        - name: source_format
+          default: csv
+        - name: snowflake_stage_table     # unqualified: lands in snowflake_schema
+          default: STG_ORDERS
+        - name: snowflake_procedure       # unqualified: runs the copy in snowflake_schema
+          default: SP_TRANSFORM_ORDERS
+
+      tasks:
+        - task_key: extract_load
+          notebook_task:
+            notebook_path: ../../notebooks/pattern_01/01_extract_load.ipynb
+        - task_key: transform
+          depends_on:
+            - task_key: extract_load
+          notebook_task:
+            notebook_path: ../../notebooks/pattern_01/02_transform.ipynb
+
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+
+      # schedule:
+      #   quartz_cron_expression: "0 0 2 * * ?"
+      #   timezone_id: UTC
+      #   pause_status: UNPAUSED
