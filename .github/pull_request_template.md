@@ -8,7 +8,8 @@
 ## What changed
 
 * Pattern / topic:
-* Session: <!-- Omnigent session name or person -->
+* Sessions: <!-- Omnigent session names or people who worked on this branch -->
+* Checkpoint: <!-- step and next from migration/pattern_NN/checkpoint.yml -->
 * Summary:
 
 ## Open items

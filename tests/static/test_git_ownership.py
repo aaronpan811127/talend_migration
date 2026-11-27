@@ -1,36 +1,16 @@
 """Branch rules from conventions.md (Git and environments), checked with git.
 
-* Branch names: migrate/pattern_NN/<YYYYMMDD-HHMM>-<session> and shared/<topic>/<YYYYMMDD-HHMM>-<session>.
+* Branch names: migrate/pattern_NN/<YYYYMMDD-HHMM> and shared/<topic>/<YYYYMMDD-HHMM> (UTC creation time).
 * A migrate branch may only change its pattern's files, compared with its stack base: the closest
   shared/... branch it is stacked on, else origin/main. Shared commits underneath are not counted.
 * A shared branch touching pattern files is a warning.
 Skipped when git or origin/main isn't available.
 """
-import datetime
 import fnmatch
-import re
-import subprocess
 
 import pytest
 
-from project import ROOT, warn
-
-MAIN = "origin/main"
-_STAMP = r"(?P<stamp>\d{8}-\d{4})-(?P<session>[a-z0-9][a-z0-9-]{0,39})"
-MIGRATE_RX = re.compile(rf"^migrate/(?P<pattern>pattern_\d{{2}})/{_STAMP}$")
-SHARED_RX = re.compile(rf"^shared/(?P<topic>[a-z0-9][a-z0-9-]{{0,39}})/{_STAMP}$")
-
-
-def parse_branch(name: str):
-    """Return the regex match for a valid migrate/ or shared/ branch name with a real UTC timestamp, else None."""
-    m = MIGRATE_RX.match(name) or SHARED_RX.match(name)
-    if not m:
-        return None
-    try:
-        datetime.datetime.strptime(m.group("stamp"), "%Y%m%d-%H%M")
-    except ValueError:
-        return None
-    return m
+from project import MAIN, current_branch, git, parse_branch, stack_base, warn
 
 
 def owned_globs(pattern: str) -> list:
@@ -50,34 +30,11 @@ def is_owned(path: str, globs: list) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)  # fnmatch's * also matches /
 
 
-def _git(*args):
-    try:
-        r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return r.stdout.strip() if r.returncode == 0 else None
-
-
 def _branch():
-    branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+    branch = current_branch()
     if branch is None:
         pytest.skip("not a git checkout (or git unavailable)")
     return branch
-
-
-def stack_base(branch: str) -> str:
-    """The ref this branch is stacked on: the closest shared/... branch (local or origin) that is an
-    ancestor of HEAD and ahead of main, else origin/main."""
-    refs = _git("for-each-ref", "--format=%(refname:short)", "refs/heads/shared", "refs/remotes/origin/shared") or ""
-    best, best_ahead = MAIN, 0
-    for ref in refs.splitlines():
-        name = ref.removeprefix("origin/")
-        if not ref or name == branch or _git("merge-base", "--is-ancestor", ref, "HEAD") is None:
-            continue
-        ahead = int(_git("rev-list", "--count", f"{MAIN}..{ref}") or 0)
-        if ahead > best_ahead:
-            best, best_ahead = ref, ahead
-    return best
 
 
 def _changed_files(base: str):
@@ -85,7 +42,7 @@ def _changed_files(base: str):
     out = set()
     for args in (("diff", "--name-only", f"{base}...HEAD"), ("diff", "--name-only", "HEAD"),
                  ("ls-files", "--others", "--exclude-standard")):
-        listing = _git(*args)
+        listing = git(*args)
         if listing is None:
             pytest.skip(f"git {' '.join(args)} failed")
         out |= {line for line in listing.splitlines() if line}
@@ -93,7 +50,7 @@ def _changed_files(base: str):
 
 
 def _require_main():
-    if _git("rev-parse", "--verify", "--quiet", MAIN) is None:
+    if git("rev-parse", "--verify", "--quiet", MAIN) is None:
         pytest.skip(f"{MAIN} not available - run git fetch")
 
 
@@ -102,8 +59,8 @@ def test_branch_name():
     if branch in ("main", "HEAD"):  # HEAD = detached, e.g. in CI
         pytest.skip(f"on {branch}")
     assert parse_branch(branch), (
-        f"branch '{branch}' must be migrate/pattern_NN/<YYYYMMDD-HHMM>-<session> (pattern work) or "
-        f"shared/<topic>/<YYYYMMDD-HHMM>-<session> (shared files); timestamp in UTC, session lowercase a-z0-9-"
+        f"branch '{branch}' must be migrate/pattern_NN/<YYYYMMDD-HHMM> (pattern work) or "
+        f"shared/<topic>/<YYYYMMDD-HHMM> (shared files); timestamp = branch creation time in UTC"
     )
 
 
@@ -132,13 +89,14 @@ def test_shared_branch_leaves_pattern_files_alone():
 
 
 @pytest.mark.parametrize("name,ok", [
-    ("migrate/pattern_01/20261126-1015-orders-load", True),
-    ("shared/read-files-incremental/20261126-0930-ops-team", True),
-    ("migrate/pattern_01", False),                      # no timestamp/session
-    ("migrate/pattern_1/20261126-1015-x", False),       # pattern id must be two digits
-    ("migrate/pattern_01/20261126-1015", False),        # no session
-    ("migrate/pattern_01/20261340-1015-x", False),      # not a real date
-    ("migrate/pattern_01/20261126-1015-Orders", False), # session must be lowercase
+    ("migrate/pattern_01/20261126-1015", True),
+    ("shared/read-files-incremental/20261126-0930", True),
+    ("migrate/pattern_01", False),                        # no timestamp
+    ("migrate/pattern_1/20261126-1015", False),           # pattern id must be two digits
+    ("migrate/pattern_01/20261126-1015-orders", False),   # no session suffix
+    ("migrate/pattern_01/20261340-1015", False),          # not a real date
+    ("migrate/pattern_01/2026112-1015", False),           # wrong timestamp format
+    ("shared/Read-Files/20261126-0930", False),           # topic must be lowercase
     ("shared/gitignore", False),
     ("feature/x", False),
 ])

@@ -1,8 +1,11 @@
 """Helpers shared by the tests: bundle paths, project rules, notebook and YAML readers."""
 import ast
 import csv
+import datetime
 import json
+import os
 import re
+import subprocess
 import warnings
 from pathlib import Path
 
@@ -197,3 +200,56 @@ def resolve_notebook(job_file: Path, notebook_path: str):
     p = (job_file.parent / notebook_path).resolve()
     candidates = [p] if p.suffix else [p.with_suffix(".ipynb"), p.with_suffix(".py")]
     return next((c for c in candidates if c.is_file()), None)
+
+
+# ---------- git (branch rules: conventions.md, Git and environments) ----------
+
+MAIN = "origin/main"
+_STAMP = r"(?P<stamp>\d{8}-\d{4})"  # branch creation time, UTC; several sessions may continue one branch
+MIGRATE_RX = re.compile(rf"^migrate/(?P<pattern>pattern_\d{{2}})/{_STAMP}$")
+SHARED_RX = re.compile(rf"^shared/(?P<topic>[a-z0-9][a-z0-9-]{{0,39}})/{_STAMP}$")
+
+
+def parse_branch(name: str):
+    """Regex match for a valid migrate/ or shared/ branch name with a real UTC timestamp, else None."""
+    m = MIGRATE_RX.match(name or "") or SHARED_RX.match(name or "")
+    if not m:
+        return None
+    try:
+        datetime.datetime.strptime(m.group("stamp"), "%Y%m%d-%H%M")
+    except ValueError:
+        return None
+    return m
+
+
+def git(*args):
+    """stdout of a git command in the bundle root, or None if git is unavailable or the command fails."""
+    try:
+        r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def current_branch():
+    """Current branch, or None outside a git checkout. In GitHub Actions HEAD is detached, so fall back
+    to the PR head branch (GITHUB_HEAD_REF) or the pushed branch (GITHUB_REF_NAME)."""
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch == "HEAD":
+        branch = os.environ.get("GITHUB_HEAD_REF") or os.environ.get("GITHUB_REF_NAME") or "HEAD"
+    return branch
+
+
+def stack_base(branch: str) -> str:
+    """The ref a branch is stacked on: the closest shared/... branch (local or origin) that is an ancestor
+    of HEAD and ahead of main, else origin/main."""
+    refs = git("for-each-ref", "--format=%(refname:short)", "refs/heads/shared", "refs/remotes/origin/shared") or ""
+    best, best_ahead = MAIN, 0
+    for ref in refs.splitlines():
+        name = ref.removeprefix("origin/")
+        if not ref or name == branch or git("merge-base", "--is-ancestor", ref, "HEAD") is None:
+            continue
+        ahead = int(git("rev-list", "--count", f"{MAIN}..{ref}") or 0)
+        if ahead > best_ahead:
+            best, best_ahead = ref, ahead
+    return best

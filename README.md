@@ -30,6 +30,7 @@ talend_migration/
 ├── migration/
 │   └── pattern_NN/
 │       ├── jobs.csv               # this pattern's inventory: Talend job -> job key -> owner -> status
+│       ├── checkpoint.yml         # progress: branch, PRs, step, done, next - read first, update before stopping
 │       ├── talend/                # Talend .item exports for this family
 │       ├── spec.md                # flow, parameters, Snowflake objects, open questions
 │       ├── components.yml         # status of every Talend component (resolved / needs_input / deferred)
@@ -45,10 +46,10 @@ talend_migration/
 
 There is no automatic Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `skills/talend-pattern-migration/references/`. Reusable findings (new operators, new mappings) go back as shared changes.
 
-1. Each session (an Omnigent sandbox session, or you in Genie Code) gets its own clone of `https://github.com/aaronpan811127/talend_migration` and its own branches, named after the session: `migrate/pattern_NN/<YYYYMMDD-HHMM>-<session>` and, if shared files must change, `shared/<topic>/<YYYYMMDD-HHMM>-<session>` (UTC). In Omnigent, clone inside the sandbox; in Genie Code, use your own Git folder. No worktrees, and never share a clone.
+1. Each session (an Omnigent sandbox session, or you in Genie Code) works in its own clone of `https://github.com/aaronpan811127/talend_migration` - in Omnigent inside the sandbox, in Genie Code your own Git folder; no worktrees, never a shared clone. A pattern's work lives on one branch, `migrate/pattern_NN/<YYYYMMDD-HHMM>` (UTC creation time), plus `shared/<topic>/<YYYYMMDD-HHMM>` if shared files must change. Sessions take turns on that branch and hand over through `migration/pattern_NN/checkpoint.yml`; a new branch is started only when the pattern has no open one.
 2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/skills`. Both skills then load automatically. Other coding agents (Claude Code, Codex, Omnigent sub-agents) read `AGENTS.md`, which points them to the same skills.
 3. Claim your pattern by creating `migration/pattern_NN/jobs.csv` (one file per pattern, so owners never conflict), put the Talend exports in `migration/pattern_NN/talend/`, and ask Genie Code to "migrate pattern_NN".
-4. The migration branch changes only your pattern's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `skills/` or other shared files go on the session's shared branch, and the migration branch is stacked on it. See `skills/talend-pattern-migration/references/conventions.md` (Git and environments).
+4. The migration branch changes only your pattern's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `skills/` or other shared files go on the pattern's shared branch, and the migration branch is stacked on it. See `skills/talend-pattern-migration/references/conventions.md` (Git and environments).
 5. Run `tests/run_tests` (or `pytest tests/static tests/patterns/pattern_NN`) and fix failures before deploying.
 6. Deploy with `--target dev` only. Each deploy lands in a lane (default `main`) with its own folder, job names and Snowflake schema; parallel agents add `--var lane=pattern_NN`.
 7. Ask Genie Code to "validate pattern_NN". The agent pushes its branches and opens stacked PRs: the shared PR into `main`, and the migration PR into the shared branch (or into `main` if there's no shared change). A human reviews and merges them, bottom first.

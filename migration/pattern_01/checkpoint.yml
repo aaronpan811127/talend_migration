@@ -1,0 +1,21 @@
+# Progress of this pattern's migration, so any session can pick up where the last one stopped.
+# Read it first; update and commit it after each step and before a session ends.
+# Format and rules: skills/talend-pattern-migration/references/conventions.md#checkpoint
+pattern: pattern_01
+branch: null            # migrate/pattern_01/<YYYYMMDD-HHMM> this work lives on; null = no migration branch yet
+base: main              # main, or the shared/<topic>/<YYYYMMDD-HHMM> branch the migration branch is stacked on
+prs:
+  shared: null          # PR number (e.g. 12) or URL once opened
+  migration: null
+step: convert           # setup | analyze | spec | convert | job_yamls | tests | validate | pr_review | done
+updated:
+  at: 2026-11-27T10:40Z # UTC
+  by: genie-code        # session name or person
+done:
+  - Reference implementation - notebooks 01_extract_load and 02_transform, job pattern_01_example, spec, components, validation config
+next:
+  - Put the real Talend exports for this family in migration/pattern_01/talend/ and replace the placeholder job ExampleOrdersLoad
+  - Get answers for the needs_input components below from the Snowflake owner
+blocked_on:
+  - tSnowflakeOutputBulkExec_1
+  - tSnowflakeRow_1

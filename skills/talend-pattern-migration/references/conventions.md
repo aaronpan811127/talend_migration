@@ -20,22 +20,42 @@ The repo is `https://github.com/aaronpan811127/talend_migration` (default branch
 
 ### Branches
 
-Every session (an Omnigent sandbox session, or a person's Genie Code session) creates its own branches. The same pattern gets new branches over time; branches are never reused across sessions.
+A pattern's work lives on one migration branch until its PR merges. Several sessions (Omnigent sandbox sessions, or people in Genie Code) can work on that branch one after another, handing over through the pattern's checkpoint (below). After the PR merges, later work on the same pattern starts a new branch.
 
 | Branch | Name | Changes | Based on |
 | --- | --- | --- | --- |
-| Migration | `migrate/pattern_NN/<YYYYMMDD-HHMM>-<session>` | only that pattern's files | the session's shared branch if it has one, else `origin/main` |
-| Shared | `shared/<topic>/<YYYYMMDD-HHMM>-<session>` | shared files (`src/operators`, `databricks.yml`, `skills/`, ...) | `origin/main` |
+| Migration | `migrate/pattern_NN/<YYYYMMDD-HHMM>` | only that pattern's files | its shared branch if it has one, else `origin/main` |
+| Shared | `shared/<topic>/<YYYYMMDD-HHMM>` | shared files (`src/operators`, `databricks.yml`, `skills/`, ...) | `origin/main` |
 
-* `<YYYYMMDD-HHMM>` is the session's start time in **UTC** (`date -u +%Y%m%d-%H%M`); `<session>` is the session name, lowercased with anything other than `a-z0-9` replaced by `-`, at most 40 characters. `<topic>` is a short lowercase slug, e.g. `read-files-incremental`. Example: `migrate/pattern_01/20261126-1015-orders-load` stacked on `shared/read-files-incremental/20261126-1015-orders-load`.
+* `<YYYYMMDD-HHMM>` is when the branch was created, in **UTC** (`date -u +%Y%m%d-%H%M`). `<topic>` is a short lowercase slug, e.g. `read-files-incremental`. Example: `migrate/pattern_01/20261127-1015` stacked on `shared/read-files-incremental/20261127-1012`.
+* **Which branch to use.** At the start of a session: `git fetch origin`, then list the pattern's branches that aren't merged yet: `git branch -r --no-merged origin/main --list 'origin/migrate/pattern_NN/*'`. Continue the newest one, reading its checkpoint first. Create a new branch only if there is none.
+* **One active session per pattern at a time.** Sessions take turns on the branch; the pattern's dev lane (`--var lane=pattern_NN`) and Snowflake schema are per pattern too. Before starting, check the checkpoint's `updated` time and the branch's latest commit, and don't start while another session is still working on it.
 * Never create a plain `migrate/pattern_NN` or `shared/<topic>` branch: git can't hold both `x` and `x/...`, so one would block the whole pattern or topic.
 * Never commit to `main`. Everything reaches `main` through reviewed PRs.
 * `tests/static/test_git_ownership.py` checks the name format and fails if a migration branch changes anything outside its pattern's files, compared with the shared branch it is stacked on (or `origin/main`).
-* **One active session per pattern at a time**, because a pattern's dev lane (`--var lane=pattern_NN`) and Snowflake schema are per pattern, not per session. A new session for the same pattern starts after the previous session's PRs are merged or closed.
 
 ### Working copy
 
-Each session has its own clone of the repo and nobody else uses it - in an Omnigent sandbox, e.g. `git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration`; for a person in Genie Code, their own Git folder (Workspace > Create > Git folder). No `git worktree`. Each clone checks out only its own session's branches.
+Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration`; for a person in Genie Code, their own Git folder (Workspace > Create > Git folder). No `git worktree`. To continue a branch: `git switch <branch>` (tracks `origin/<branch>`), then `git pull` before making changes.
+
+### Checkpoint
+
+`migration/pattern_NN/checkpoint.yml` is the pattern's progress, committed on the migration branch. A session reads it first and updates it after each step and before it stops, so the next session continues instead of starting over. It holds the current state only - commit messages are the history.
+
+| Field | Meaning |
+| --- | --- |
+| `pattern` | the folder's pattern id |
+| `branch` | the migration branch this work lives on (`migrate/pattern_NN/<YYYYMMDD-HHMM>`), `null` before one exists |
+| `base` | `main`, or the `shared/...` branch the migration branch is stacked on |
+| `prs` | `shared` and `migration`: PR number or URL once opened, else `null` |
+| `step` | `setup`, `analyze`, `spec`, `convert`, `job_yamls`, `tests`, `validate`, `pr_review`, or `done` (every job in `jobs.csv` is `done`, e.g. after cutover) |
+| `updated` | `at` (UTC, `YYYY-MM-DDTHH:MMZ`) and `by` (session name or person) |
+| `done` | short sentences: what is finished |
+| `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
+| `blocked_on` | optional: `needs_input` components or other blockers |
+| `notes` | optional free text |
+
+No scripts are needed: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `base` match the branch you're on and its stack, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, and warns when a `needs_input` component is missing from `blocked_on`.
 
 ### Stacked PRs
 
@@ -47,13 +67,14 @@ A pattern is delivered as one migration PR, stacked on a shared PR when it needs
 4. **Review fixes.** Push more commits to the same branch. After changing the shared branch, merge it into the migration branch again.
 5. **After the shared PR merges,** point the migration PR at `main` if GitHub hasn't already (`gh pr edit <n> --base main`), merge `origin/main` into the migration branch, rerun the tests and push.
 6. **PR description** (`.github/pull_request_template.md`): stack position, open `needs_input` / `deferred` components, test output, dev run URLs, reconciliation results.
+7. **Checkpoint.** Record each new branch (`branch`, `base`) and PR (`prs`) in `checkpoint.yml` as soon as it exists. Once the PRs are open, `step` stays `pr_review` while review fixes are pushed; merging is what finishes the branch (git and GitHub show it), so nobody commits to it afterwards.
 
-Rules: commit small; run `pytest tests/static tests/patterns/pattern_NN` before every push; push only your own session's branches; no force-push, no rebasing pushed commits, no deleting other sessions' branches; agents create PRs but never approve or merge them. Creating PRs from a sandbox needs the `gh` CLI (or the GitHub API) with GitHub credentials provided by the session - never stored in the repo.
+Rules: commit small; run `pytest tests/static tests/patterns/pattern_NN` before every push; pull before you start and push before you stop, so the next session sees your work; push only your pattern's branches (and their shared branch); no force-push, no rebasing pushed commits, no deleting branches; agents create PRs but never approve or merge them. Creating PRs from a sandbox needs the `gh` CLI (or the GitHub API) with GitHub credentials provided by the session - never stored in the repo.
 
 ### Deploying
 
 * Deploy only with `--target dev`. Each deploy goes into a **lane** (bundle variable `lane`): its own folder `~/.bundle/talend_migration/dev/<lane>` (so its own state and deployment lock), job-name prefix `[dev <user> <lane>]` and Snowflake schema. People use the default lane `main`. Anything that deploys in parallel under the same identity - Omnigent sub-agents, several terminals, CI jobs - passes `--var lane=pattern_NN` (or sets `BUNDLE_VAR_lane`), one lane per pattern.
-* Lanes isolate deploys, jobs and Snowflake data; the session's own clone isolates source. A deploy from a sandbox clone uploads that clone's files to the lane's folder; a deploy from a workspace Git folder runs that folder's files in place. Either way, jobs run exactly what's in your working copy, committed or not.
+* Lanes isolate deploys, jobs and Snowflake data; each session's own clone isolates source. A deploy from a sandbox clone uploads that clone's files to the lane's folder; a deploy from a workspace Git folder runs that folder's files in place. Either way, jobs run exactly what's in your working copy, committed or not.
 * Prod deploys happen from `main` through CI or the platform owner, never from a pattern branch.
 
 ## Naming
@@ -153,4 +174,4 @@ Pattern folder and inventory:
 2. `pytest tests/static tests/patterns/pattern_NN` passes; `bundle validate --strict --target dev` passes.
 3. Every job in the family ran successfully in dev.
 4. `validation.yml` reconciliation PASS for every job on at least one representative load (ideally 2-3 different business dates), recorded in `validation_results.md`.
-5. The session's PRs (migration PR, stacked on its shared PR if any) are reviewed and merged to `main` by a human.
+5. The pattern's PRs (migration PR, stacked on its shared PR if any) are reviewed and merged to `main` by a human; the merged `checkpoint.yml` shows `step: pr_review` with both PRs recorded.

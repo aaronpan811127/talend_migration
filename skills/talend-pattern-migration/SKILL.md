@@ -21,7 +21,8 @@ When conversion is finished, hand off to the `talend-migration-validation` skill
 * Bundle root (`<root>`) = the folder two levels above this skill folder (`<root>/skills/talend-pattern-migration`). Confirm `<root>/databricks.yml` has `bundle.name: talend_migration`.
 * Ask for the pattern id (`pattern_NN`, two digits) if it isn't given. Look it up in `<root>/migration/<pattern>/jobs.csv` to get the Talend jobs in that family and the owner. If the user is not the owner listed, tell them and stop unless they confirm.
 * `<root>` must be the user's own Git folder clone of `aaronpan811127/talend_migration`, not the reference checkout `/Workspace/Users/aaron.pan@databricks.com/talend_migration` and not a clone another session uses. Load the `git` skill and check the branch with `runGit` `status`.
-* Branches follow conventions (Git and environments): `migrate/<pattern>/<YYYYMMDD-HHMM>-<session>` (UTC time of this session's start; `<session>` = a short lowercase slug the user picks), plus `shared/<topic>/<YYYYMMDD-HHMM>-<session>` from `origin/main` if shared files must change, with the migration branch created from it. Confirm the names with the user, `pull` `main`, then create them with `runGit` `checkout` (it keeps uncommitted changes). Never reuse another session's branch or a plain `migrate/<pattern>`.
+* Find the pattern's open branch (conventions, Git and environments): `runGit` `list_branches`, and look for unmerged `migrate/<pattern>/<YYYYMMDD-HHMM>` branches. If one exists, check it out, `pull`, and read `migration/<pattern>/checkpoint.yml`: tell the user its `step`, `done`, `next` and `blocked_on`, and continue from `next` (skip the steps it marks done). If there is none, propose `migrate/<pattern>/<UTC YYYYMMDD-HHMM>` (plus `shared/<topic>/<UTC YYYYMMDD-HHMM>` from `origin/main` if shared files must change, with the migration branch created from it), confirm with the user, `pull` `main`, and create them with `runGit` `checkout`. Never create a plain `migrate/<pattern>` branch.
+* Keep `migration/<pattern>/checkpoint.yml` current (conventions, Checkpoint): update `step`, `done`, `next`, `blocked_on` and `updated` (UTC time, `by` = the user or session) at the end of every step below and before the session ends, and record new branches and PRs.
 
 ## Step 1 - Read the Talend exports
 
@@ -79,14 +80,15 @@ One file per Talend job: `resources/jobs/<pattern>_<talend_job_snake>.job.yml`, 
 
 ## Step 7 - Update status and hand off
 
-* Update `migration/<pattern>/jobs.csv` (`status` -> `validating`).
+* Update `migration/<pattern>/jobs.csv` (`status` -> `validating`) and the checkpoint (`step: validate`, `next`).
 * Review the changes with `runGit` `diff`, then offer to commit and push: shared files to the shared branch (`shared: ...`), pattern files to the migration branch (`<pattern>: ...`). Only commit and push after the user agrees, and pass `files` so each commit contains only that branch's files.
 * Stacked PRs: shared branch -> `main`, migration branch -> shared branch (or -> `main`). Genie Code can't call GitHub, so give the user the compare links that open each PR, bottom first: `https://github.com/aaronpan811127/talend_migration/compare/main...<shared branch>?expand=1` and `.../compare/<shared branch>...<migration branch>?expand=1`, with a PR body filled from `.github/pull_request_template.md`.
 * Summarize: files changed, and every `needs_input` / `deferred` component with its reason. Then continue with the `talend-migration-validation` skill.
 
 ## Do not
 
-* Commit to `main`, force-push, rebase pushed branches, or push another session's branch.
+* Commit to `main`, force-push, rebase pushed branches, or push branches of other patterns.
+* End a session without committing and pushing an updated checkpoint, if the user agreed to push.
 * Edit another pattern's files, `databricks.yml`, `src/operators/*`, the shared tests (`tests/static`, `tests/unit`, `tests/project.py`, `tests/conftest.py`), or the skills, unless the user explicitly says this is a shared change.
 * Weaken or skip a static test to make it pass. If a rule doesn't fit your pattern, raise it as a shared change.
 * Deploy to `prod` or unpause schedules.

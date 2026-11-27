@@ -32,20 +32,19 @@ The repo is `https://github.com/aaronpan811127/talend_migration`, default branch
 
 Full rules: `skills/talend-pattern-migration/references/conventions.md`, section Git and environments.
 
-1. **Your own clone and branches.** Don't edit the reference Git folder `/Workspace/Users/aaron.pan@databricks.com/talend_migration`, don't use `git worktree`, and don't share a clone with another session. Clone into the sandbox and name your branches after this session:
+1. **Your own clone; continue the pattern's branch if it has one.** Don't edit the reference Git folder `/Workspace/Users/aaron.pan@databricks.com/talend_migration`, don't use `git worktree`, and don't share a clone with another session. Other sessions may have worked on this pattern before you - their progress is in the branch's `migration/pattern_NN/checkpoint.yml`.
    ```
    git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration && cd ~/talend_migration
-   TS=$(date -u +%Y%m%d-%H%M)              # session start, UTC
-   SESSION=<this session's name, lowercase, non a-z0-9 -> "-", max 40 chars>
-   MIGRATE=migrate/pattern_NN/$TS-$SESSION
-   SHARED=shared/<topic>/$TS-$SESSION     # only if you need a shared change
+   git branch -r --no-merged origin/main --list 'origin/migrate/pattern_NN/*'   # open branches for your pattern
    ```
-   Never create or push a plain `migrate/pattern_NN` or `shared/<topic>` branch.
+   * **One exists:** `git switch <newest one, without origin/>`, read `migration/pattern_NN/checkpoint.yml` (and `git log`), and continue from its `next`. If its `updated.at` or latest commit is very recent, another session may still be on it - stop and report instead of working in parallel.
+   * **None:** create new branches named by the current UTC time, `TS=$(date -u +%Y%m%d-%H%M)`: `MIGRATE=migrate/pattern_NN/$TS` and, only if you need a shared change, `SHARED=shared/<topic>/$TS`. Never create or push a plain `migrate/pattern_NN` or `shared/<topic>` branch.
+   * **Checkpoint:** update `migration/pattern_NN/checkpoint.yml` (format in conventions, section Checkpoint) after each step and always before you stop: `branch`, `base`, `prs`, `step`, `updated` (UTC time and your session name), `done`, `next`, `blocked_on`. Commit it with your work and push, so the next session can pick up.
 2. **Shared change first (if needed):** `git switch -c $SHARED origin/main`, commit only shared files (`shared: <what>`), push, then `gh pr create --base main --head $SHARED --title "shared: <topic>" --body-file <filled .github/pull_request_template.md>`.
 3. **Migration branch:** `git switch -c $MIGRATE $SHARED` (or `origin/main` if there is no shared change). Commit small with `pattern_NN: <what>`; stage only your pattern's files, never `git add -A` blindly. Push, then `gh pr create --base $SHARED --head $MIGRATE --title "pattern_NN: <summary>"` (base `main` if no shared branch), with "Stacked on #<shared PR>" at the top of the body.
 4. **Need a shared change later?** Create `$SHARED` from `origin/main` and open its PR, then `git merge $SHARED` into `$MIGRATE` and `gh pr edit <migration PR> --base $SHARED`. Merge, never rebase.
 5. **Before every push** run `pytest tests/static tests/patterns/pattern_NN`. `tests/static/test_git_ownership.py` fails if the migration branch changes anything outside your pattern (compared with the shared branch below it) or if a branch name is wrong.
-6. **Never** push to `main`, force-push, rebase pushed commits, delete other sessions' branches, or approve or merge PRs - a human merges, bottom of the stack first. If `gh` or GitHub credentials are missing, push what you can and report the branch names and the compare URLs (`https://github.com/aaronpan811127/talend_migration/compare/<base>...<head>`).
+6. **Never** push to `main`, force-push, rebase pushed commits, delete branches, or approve or merge PRs - a human merges, bottom of the stack first. If `gh` or GitHub credentials are missing, push what you can and report the branch names and the compare URLs (`https://github.com/aaronpan811127/talend_migration/compare/<base>...<head>`).
 7. **Staying current:** `git fetch origin`, then `git merge origin/main` into your top branch (or merge `$SHARED` into `$MIGRATE` after changing it). Resolve conflicts in your pattern's files; stop and report conflicts in shared files you didn't change.
 
 ## Tool mapping (Genie Code -> you)
@@ -103,6 +102,7 @@ databricks bundle run <job_key> --target dev --var lane=pattern_NN
 Report back:
 
 * your branches, PR URLs and stack order (shared PR -> migration PR), or why you couldn't push or open them;
+* the checkpoint you committed (`step` and `next`);
 * files changed;
 * output of `pytest tests/static tests/patterns/pattern_NN` and `bundle validate`, and the run URLs if you deployed;
 * every `needs_input` / `deferred` component with its reason;
