@@ -9,8 +9,11 @@ import pytest
 from project import current_branch, inventory_rows, load_yaml, parse_branch, pattern_dirs, stack_base, warn
 
 STEPS = ["setup", "analyze", "spec", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
-FIELDS = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next", "blocked_on", "notes"}
-REQUIRED = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next"}
+FIELDS = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
+REQUIRED = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next", "sessions"}
+SESSION_FIELDS = {"id", "by", "at", "summary", "url"}
+SESSION_REQUIRED = {"id", "by", "at", "summary"}
+TIME_FMT = "%Y-%m-%dT%H:%MZ"
 PR_RX = re.compile(r"^(#?\d+|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+)$")
 
 
@@ -69,11 +72,40 @@ class TestCheckpoint:
         upd = _load(folder).get("updated") or {}
         assert isinstance(upd, dict) and upd.get("by"), "updated.by (session name or person) is required"
         try:
-            at = datetime.datetime.strptime(str(upd.get("at")), "%Y-%m-%dT%H:%MZ")
+            at = datetime.datetime.strptime(str(upd.get("at")), TIME_FMT)
         except ValueError:
             pytest.fail(f"updated.at must be UTC YYYY-MM-DDTHH:MMZ, got {upd.get('at')!r}")
         now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         assert at <= now + datetime.timedelta(minutes=10), "updated.at is in the future"
+
+    def test_sessions(self, folder):
+        """Hand-over log: complete entries, oldest first, none later than `updated`."""
+        cp = _load(folder)
+        sessions = cp.get("sessions")
+        assert isinstance(sessions, list) and sessions, "sessions must list at least the session that created the checkpoint"
+        times, problems = [], []
+        for i, s in enumerate(sessions, 1):
+            if not isinstance(s, dict):
+                problems.append(f"entry {i} must be a mapping")
+                continue
+            missing, unknown = SESSION_REQUIRED - set(s), set(s) - SESSION_FIELDS
+            if missing or unknown:
+                problems.append(f"entry {i}: missing {sorted(missing)} unknown {sorted(unknown)}")
+            if any(not str(s.get(k) or "").strip() for k in SESSION_REQUIRED):
+                problems.append(f"entry {i}: id, by, at and summary must be non-empty")
+            if s.get("url") and not str(s["url"]).startswith("https://"):
+                problems.append(f"entry {i}: url must be an https link to the session")
+            try:
+                times.append(datetime.datetime.strptime(str(s.get("at")), TIME_FMT))
+            except ValueError:
+                problems.append(f"entry {i}: at must be UTC YYYY-MM-DDTHH:MMZ, got {s.get('at')!r}")
+        assert not problems, problems
+        assert times == sorted(times), "sessions must be oldest first (append new entries at the end)"
+        try:
+            updated = datetime.datetime.strptime(str((cp.get("updated") or {}).get("at")), TIME_FMT)
+        except ValueError:
+            return  # reported by test_updated
+        assert times[-1] <= updated, "the last sessions entry is later than updated.at - update both at hand-over"
 
     def test_step_matches_jobs_csv(self, folder):
         cp, statuses = _load(folder), _statuses(folder.name)

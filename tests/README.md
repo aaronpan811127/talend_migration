@@ -27,10 +27,10 @@ They check every pattern automatically, so a new pattern needs no new static tes
 | `test_jobs.py` | file and key naming; tags; common parameter defaults; task keys, `depends_on`, no cycles; notebooks exist inside the pattern folder; `run_job_task` references; every parameter read by a widget; Snowflake table parameters unqualified, no hard-coded `MIGRATION_DEV`; schedules PAUSED |
 | `test_bundle_config.py` | `databricks.yml` name, include, required variables, dev/prod targets; dev `snowflake_schema` is per developer; every `${var.x}` declared |
 | `test_components.py` | `components.yml` fields and statuses; notebooks and cell titles exist; `[REVIEW]` cells tracked as manual; standard types documented in component-mapping.md; no `needs_input` once jobs are `ready_for_review` |
-| `test_checkpoint.py` | `checkpoint.yml` required once work starts; fields and step values; `branch`/`base` match the current migration branch and its stack; step agrees with `jobs.csv`; PRs recorded from `pr_review`; warns when `needs_input` components aren't in `blocked_on` |
+| `test_checkpoint.py` | `checkpoint.yml` required once work starts; fields and step values; `branch`/`base` match the current migration branch and its stack; step agrees with `jobs.csv`; PRs recorded from `pr_review`; `sessions` entries complete, oldest first, none later than `updated.at`; warns when `needs_input` components aren't in `blocked_on` |
 | `test_git_ownership.py` | branch names (`migrate/pattern_NN/<YYYYMMDD-HHMM>`, `shared/<topic>/<YYYYMMDD-HHMM>`); a migration branch changes only its pattern's files compared with the shared branch it's stacked on (else `origin/main`); warning when a shared branch touches pattern files. Skipped without git or `origin/main` |
 | `test_agents_md.py` | `AGENTS.md` points to every skill and only to paths that exist; `CLAUDE.md` imports it |
-| `test_migration_config.py` | per-pattern `jobs.csv` header, statuses, keys (unique across patterns), owner; jobs.csv and job files agree; `spec.md` and `validation.yml` structure; Snowflake `actual` uses `${snowflake_schema}` and doesn't point at prod |
+| `test_migration_config.py` | per-pattern `jobs.csv` header, statuses, keys (unique across patterns), owner; jobs.csv and job files agree; `spec.md` and its `## Decisions` table (header, dated rows, oldest first); `validation.yml` structure; Snowflake `actual` uses `${snowflake_schema}` and doesn't point at prod |
 
 A failed assertion blocks review. A `UserWarning` in the summary is advisory and should be explained in the PR.
 

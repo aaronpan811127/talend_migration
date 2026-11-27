@@ -53,9 +53,38 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `done` | short sentences: what is finished |
 | `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
 | `blocked_on` | optional: `needs_input` components or other blockers |
+| `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over: `id` (Omnigent session id, or `genie-code` / `manual`), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
 | `notes` | optional free text |
 
-No scripts are needed: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `base` match the branch you're on and its stack, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, and warns when a `needs_input` component is missing from `blocked_on`.
+No scripts are needed: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `base` match the branch you're on and its stack, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
+
+### Decisions
+
+Every choice a later session or reviewer must not undo goes in the `## Decisions` table of `migration/pattern_NN/spec.md`, one row each, newest last: `| Date | Decision | Why | Decided by |` (date `YYYY-MM-DD`; `Decided by` = the person, or `agent` if the agent chose and nobody objected). Examples: how a tMap reject is implemented, which audit columns validation ignores, an answer the Snowflake owner gave. Chat is not a record - if it isn't in the table, the next session doesn't know it. Questions that still need an answer stay in `components.yml` (`needs_input`) or the spec's Open questions until decided, then move here.
+
+### Resuming and handing over
+
+A new session gets nothing from earlier sessions except what was pushed. It never sees their chat, sandbox files or uncommitted work.
+
+**Resume (start of every session),** in this order, before changing anything:
+
+1. `git fetch origin`; find the pattern's open branch (see Branches); `git switch` to it and `git pull`.
+2. `migration/pattern_NN/checkpoint.yml`: `step`, `next`, `blocked_on`, and the last `sessions` entries.
+3. `git log --oneline origin/<base>..HEAD` (`base` from the checkpoint) - what earlier sessions changed.
+4. `spec.md`, especially `## Decisions` and Open questions.
+5. `components.yml`: every `needs_input` and `deferred` item.
+6. `validation_results.md`, if it exists.
+7. Review feedback on the open PRs (`prs` in the checkpoint): `gh pr view <n> --comments`, plus `gh pr checks <n>`.
+8. Summarize the state in a few lines (where it stands, what you'll do next, what's blocked) - as your first report, or to the user in Genie Code - then continue from `next`.
+
+**Hand over (before every stop, including when blocked or out of time):**
+
+1. Commit what you have, even half done: `pattern_NN: WIP <what>` - never leave work uncommitted.
+2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append your `sessions` entry.
+3. Add any decision you made or were given to `## Decisions`.
+4. Run `pytest tests/static tests/patterns/pattern_NN`, push.
+
+**Forking a previous session (for people starting a session).** A fresh session plus the resume procedure is the default - the repo carries the state. When the last session stopped in the middle of something whose reasoning matters (a half-finished tMap translation, a debugging thread), you can start the next session as a fork of it with the Omnigent CLI, `omnigent run --fork <session id>`, taking the id from the checkpoint's last `sessions` entry. You need access to that session (shared with you, or your own). A fork inherits the old chat but not newer pushes, so the forked session still runs the resume procedure. Agents can't read or fork other sessions themselves.
 
 ### Stacked PRs
 

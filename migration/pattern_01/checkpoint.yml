@@ -9,7 +9,7 @@ prs:
   migration: null
 step: convert           # setup | analyze | spec | convert | job_yamls | tests | validate | pr_review | done
 updated:
-  at: 2026-11-27T10:40Z # UTC
+  at: 2026-11-27T11:15Z # UTC
   by: genie-code        # session name or person
 done:
   - Reference implementation - notebooks 01_extract_load and 02_transform, job pattern_01_example, spec, components, validation config
@@ -19,3 +19,10 @@ next:
 blocked_on:
   - tSnowflakeOutputBulkExec_1
   - tSnowflakeRow_1
+# One entry per session, oldest first, appended at hand-over. id = Omnigent session id (fork it with
+# `omnigent run --fork <id>`), or genie-code / manual. Conventions: Resuming and handing over.
+sessions:
+  - id: genie-code
+    by: aaron.pan@databricks.com
+    at: 2026-11-27T11:15Z
+    summary: Built the pattern_01 reference (notebooks, job, spec, components, validation); first checkpoint and decisions

@@ -30,9 +30,9 @@ talend_migration/
 ├── migration/
 │   └── pattern_NN/
 │       ├── jobs.csv               # this pattern's inventory: Talend job -> job key -> owner -> status
-│       ├── checkpoint.yml         # progress: branch, PRs, step, done, next - read first, update before stopping
+│       ├── checkpoint.yml         # progress: branch, PRs, step, done, next, sessions - read first, update before stopping
 │       ├── talend/                # Talend .item exports for this family
-│       ├── spec.md                # flow, parameters, Snowflake objects, open questions
+│       ├── spec.md                # flow, parameters, Snowflake objects, Decisions, open questions
 │       ├── components.yml         # status of every Talend component (resolved / needs_input / deferred)
 │       ├── validation.yml         # reconciliation checks
 │       └── validation_results.md  # recorded results
@@ -53,6 +53,17 @@ There is no automatic Talend-to-Databricks converter. Each developer works out t
 5. Run `tests/run_tests` (or `pytest tests/static tests/patterns/pattern_NN`) and fix failures before deploying.
 6. Deploy with `--target dev` only. Each deploy lands in a lane (default `main`) with its own folder, job names and Snowflake schema; parallel agents add `--var lane=pattern_NN`.
 7. Ask Genie Code to "validate pattern_NN". The agent pushes its branches and opens stacked PRs: the shared PR into `main`, and the migration PR into the shared branch (or into `main` if there's no shared change). A human reviews and merges them, bottom first.
+
+### Starting an Omnigent session for a pattern
+
+A session only knows what earlier sessions pushed. It never sees their chat or sandbox. So:
+
+* **New or continuing pattern (default): start a fresh session** in `<workspace-url>/omnigent` (host: Sandbox) with a prompt like:
+  > Work on pattern_02 of https://github.com/aaronpan811127/talend_migration. Follow AGENTS.md: clone the repo, continue the pattern's open `migrate/pattern_02/...` branch if there is one (run the resume procedure first) or create one, use `--var lane=pattern_02`. Your Omnigent session id is `<session id>`; record it in the checkpoint's `sessions` entry when you hand over. Don't deploy.
+* **Continuing a half-finished step whose reasoning matters:** fork the last session listed in `migration/pattern_02/checkpoint.yml` (`sessions[-1].id`) with the Omnigent CLI, `omnigent run --fork <session id>`, then send the same prompt. The fork inherits that session's chat; it still runs the resume procedure, because the branch may have moved on. You need access to the session you fork.
+* Only one session per pattern at a time. Check the checkpoint's `updated` time before starting one.
+
+Details: `skills/talend-pattern-migration/references/conventions.md`, sections Checkpoint, Decisions, and Resuming and handing over.
 
 The package is named `operators` rather than `operator` so it doesn't shadow Python's built-in `operator` module.
 

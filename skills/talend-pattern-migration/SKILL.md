@@ -21,8 +21,9 @@ When conversion is finished, hand off to the `talend-migration-validation` skill
 * Bundle root (`<root>`) = the folder two levels above this skill folder (`<root>/skills/talend-pattern-migration`). Confirm `<root>/databricks.yml` has `bundle.name: talend_migration`.
 * Ask for the pattern id (`pattern_NN`, two digits) if it isn't given. Look it up in `<root>/migration/<pattern>/jobs.csv` to get the Talend jobs in that family and the owner. If the user is not the owner listed, tell them and stop unless they confirm.
 * `<root>` must be the user's own Git folder clone of `aaronpan811127/talend_migration`, not the reference checkout `/Workspace/Users/aaron.pan@databricks.com/talend_migration` and not a clone another session uses. Load the `git` skill and check the branch with `runGit` `status`.
-* Find the pattern's open branch (conventions, Git and environments): `runGit` `list_branches`, and look for unmerged `migrate/<pattern>/<YYYYMMDD-HHMM>` branches. If one exists, check it out, `pull`, and read `migration/<pattern>/checkpoint.yml`: tell the user its `step`, `done`, `next` and `blocked_on`, and continue from `next` (skip the steps it marks done). If there is none, propose `migrate/<pattern>/<UTC YYYYMMDD-HHMM>` (plus `shared/<topic>/<UTC YYYYMMDD-HHMM>` from `origin/main` if shared files must change, with the migration branch created from it), confirm with the user, `pull` `main`, and create them with `runGit` `checkout`. Never create a plain `migrate/<pattern>` branch.
-* Keep `migration/<pattern>/checkpoint.yml` current (conventions, Checkpoint): update `step`, `done`, `next`, `blocked_on` and `updated` (UTC time, `by` = the user or session) at the end of every step below and before the session ends, and record new branches and PRs.
+* Find the pattern's open branch (conventions, Git and environments): `runGit` `list_branches`, and look for unmerged `migrate/<pattern>/<YYYYMMDD-HHMM>` branches. If one exists, check it out, `pull`, and run the resume procedure (conventions, Resuming and handing over): checkpoint, the branch's commits since its base, `spec.md` (`## Decisions`, Open questions), open `components.yml` items, `validation_results.md`, and the PR comments (ask the user to paste them if needed, since Genie Code can't reach GitHub). Tell the user the state in a few lines and continue from `next`, skipping the steps marked done. If there is none, propose `migrate/<pattern>/<UTC YYYYMMDD-HHMM>` (plus `shared/<topic>/<UTC YYYYMMDD-HHMM>` from `origin/main` if shared files must change, with the migration branch created from it), confirm with the user, `pull` `main`, and create them with `runGit` `checkout`. Never create a plain `migrate/<pattern>` branch.
+* Keep `migration/<pattern>/checkpoint.yml` current (conventions, Checkpoint): update `step`, `done`, `next`, `blocked_on` and `updated` (UTC time, `by` = the user or session) at the end of every step below, and record new branches and PRs. Record every decision the user makes or confirms in the `## Decisions` table of `spec.md`.
+* Before the session ends, hand over (conventions, Resuming and handing over): with the user's OK, commit even unfinished work (`<pattern>: WIP ...`), append a `sessions` entry (`id: genie-code`, `by` = the user's email, `at`, one-line `summary`), and push.
 
 ## Step 1 - Read the Talend exports
 
@@ -44,14 +45,14 @@ Skip if `<root>/notebooks/<pattern>/` already exists. Never overwrite existing f
 * `notebooks/<pattern>/` - one notebook per job task (`01_<step>`, `02_<step>` ...), based on the notebooks in `notebooks/pattern_01/` and retitled. Decide the split from the Talend subjobs (see notebook-template.md).
 * `tests/patterns/<pattern>/test_<pattern>_*.py` - start from `tests/patterns/pattern_01/test_pattern_01.py`.
 * `resources/jobs/<pattern>_<talend_job_snake>.job.yml` - one per Talend job, based on `resources/jobs/pattern_01_example.job.yml`, with the job key, name and tags from conventions.
-* `migration/<pattern>/spec.md`, `components.yml` and `validation.yml` - based on pattern_01's, with placeholders reset.
+* `migration/<pattern>/spec.md` (with an empty `## Decisions` table), `components.yml`, `validation.yml` and `checkpoint.yml` - based on pattern_01's, with placeholders reset.
 * `migration/<pattern>/jobs.csv` (header `talend_job,job_key,owner,status,notes`) with a row per Talend job (`status` = `analyzing`).
 
 Show the developer the list of files before creating them.
 
 ## Step 3 - Write the spec
 
-Fill in `migration/<pattern>/spec.md` from Step 1: flow (source -> steps -> targets), parameters (common vs per job), Snowflake objects and procedures touched, variances between jobs, open questions. Keep it short and factual - this is what reviewers and other teammates read.
+Fill in `migration/<pattern>/spec.md` from Step 1: flow (source -> steps -> targets), parameters (common vs per job), Snowflake objects and procedures touched, variances between jobs, open questions, and the `## Decisions` table (conventions, Decisions). Keep it short and factual - this is what reviewers and other teammates read.
 
 ## Step 4 - Convert the notebook
 

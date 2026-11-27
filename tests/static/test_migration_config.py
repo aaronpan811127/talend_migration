@@ -83,6 +83,31 @@ def test_migration_folder_only_holds_patterns():
 
 @pytest.mark.parametrize("folder", PATTERN_DIRS, ids=lambda p: p.name)
 class TestPatternFolder:
+    def test_spec_decisions(self, folder):
+        """spec.md has a `## Decisions` table: | Date | Decision | Why | Decided by |, valid dates, oldest first."""
+        spec = folder / "spec.md"
+        if not spec.is_file():
+            pytest.skip("spec.md missing (reported by test_spec_exists)")
+        text = spec.read_text()
+        m = re.search(r"^## Decisions\s*$(.*?)(?=^## |\Z)", text, flags=re.M | re.S)
+        assert m, "spec.md needs a '## Decisions' section (conventions, Decisions)"
+        rows = [l.strip() for l in m.group(1).splitlines() if l.strip().startswith("|")]
+        header = [c.strip() for c in rows[0].strip("|").split("|")] if rows else []
+        assert header == ["Date", "Decision", "Why", "Decided by"], \
+            f"Decisions table header must be | Date | Decision | Why | Decided by |, got {header}"
+        dates, problems = [], []
+        for row in rows[2:]:  # skip header and separator
+            cells = [c.strip() for c in row.strip("|").split("|")]
+            if len(cells) != 4 or not all(cells):
+                problems.append(f"row needs 4 non-empty cells: {row[:80]}")
+                continue
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", cells[0]):
+                problems.append(f"date must be YYYY-MM-DD: {cells[0]}")
+            else:
+                dates.append(cells[0])
+        assert not problems, problems
+        assert dates == sorted(dates), "decisions must be oldest first (append new rows at the end)"
+
     def test_spec_exists(self, folder):
         spec = folder / "spec.md"
         assert spec.is_file(), "spec.md missing"

@@ -37,6 +37,16 @@ Tracked per component, with status and behaviour differences, in [components.yml
 
 None known yet.
 
+## Decisions
+
+Choices later sessions and reviewers must not undo without asking. Newest last.
+
+| Date | Decision | Why | Decided by |
+| --- | --- | --- | --- |
+| 2026-11-24 | Keep Snowflake as the target and keep the Snowflake stored procedure for the transform | Project scope: lift Talend orchestration to Databricks first, no move to Delta yet | aaron.pan@databricks.com |
+| 2026-11-25 | Two notebooks, one per task: `01_extract_load`, then `02_transform` | A failed procedure call can be repaired without reloading the stage | aaron.pan@databricks.com |
+| 2026-11-26 | Stage table and procedure names are unqualified; the schema comes from `snowflake_schema` | Each developer and lane writes and calls into its own shadow schema | aaron.pan@databricks.com |
+
 ## Open questions
 
 * Replace the placeholder job with the real Talend jobs of this family and their exports.
