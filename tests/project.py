@@ -240,9 +240,10 @@ def current_branch():
     return branch
 
 
-def stack_base(branch: str) -> str:
-    """The ref a branch is stacked on: the closest shared/... branch (local or origin) that is an ancestor
-    of HEAD and ahead of main, else origin/main."""
+def shared_base(branch: str) -> str:
+    """What a branch's own changes are measured against: the unmerged shared/... branch (local or origin)
+    merged into it - the closest one that is an ancestor of HEAD and ahead of main - else origin/main.
+    PRs are not stacked (all target main); this only keeps merged-in shared commits out of ownership checks."""
     refs = git("for-each-ref", "--format=%(refname:short)", "refs/heads/shared", "refs/remotes/origin/shared") or ""
     best, best_ahead = MAIN, 0
     for ref in refs.splitlines():

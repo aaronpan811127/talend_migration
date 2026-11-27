@@ -1,9 +1,9 @@
 <!-- Title: "pattern_NN: <summary>" for a migration PR, "shared: <topic>" for a shared PR. -->
 
-## Stack
+## Depends on
 
-<!-- Migration PR stacked on a shared PR: "Stacked on #<shared PR>" (base = that shared branch). Otherwise "Base: main". -->
-<!-- Shared PR: "Needed by #<migration PR(s)>". -->
+<!-- Every PR targets main. Migration PR that merged in an unmerged shared branch: "Depends on #<shared PR> - merge that first" (its shared commits show here until then). Otherwise "None". -->
+<!-- Shared PR: "Needed by #<migration PR(s)>", if any. -->
 
 ## What changed
 
@@ -24,4 +24,4 @@
 - [ ] Reconciliation results (`migration/pattern_NN/validation_results.md`), if validated
 - [ ] Shared PR: unit tests for changed operators; every pattern owner whose files it touches has approved
 
-Agents open this PR; a human reviews and merges it, bottom of the stack first.
+Agents open this PR; a human reviews and merges it - shared PRs before the migration PRs that depend on them.

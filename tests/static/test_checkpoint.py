@@ -6,11 +6,11 @@ import re
 
 import pytest
 
-from project import current_branch, inventory_rows, load_yaml, parse_branch, pattern_dirs, stack_base, warn
+from project import MAIN, current_branch, inventory_rows, load_yaml, parse_branch, pattern_dirs, shared_base, warn
 
 STEPS = ["setup", "analyze", "spec", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
-FIELDS = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
-REQUIRED = {"pattern", "branch", "base", "prs", "step", "updated", "done", "next", "sessions"}
+FIELDS = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
+REQUIRED = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
 SESSION_FIELDS = {"id", "by", "at", "summary", "url"}
 SESSION_REQUIRED = {"id", "by", "at", "summary"}
 TIME_FMT = "%Y-%m-%dT%H:%MZ"
@@ -45,15 +45,15 @@ class TestCheckpoint:
         if cp["step"] != "done":
             assert cp.get("next"), "next must say what the next session does first (empty only when step is done)"
 
-    def test_branch_and_base(self, folder):
+    def test_branch_and_depends_on(self, folder):
         cp = _load(folder)
-        branch, base = cp.get("branch"), cp.get("base")
+        branch, dep = cp.get("branch"), cp.get("depends_on")
         if branch is not None:
             m = parse_branch(branch)
             assert m and branch.startswith(f"migrate/{folder.name}/"), \
                 f"branch must be migrate/{folder.name}/<YYYYMMDD-HHMM> or null, got {branch!r}"
-        assert base == "main" or (str(base).startswith("shared/") and parse_branch(base)), \
-            f"base must be main or shared/<topic>/<YYYYMMDD-HHMM>, got {base!r}"
+        assert dep is None or (str(dep).startswith("shared/") and parse_branch(dep)), \
+            f"depends_on must be null or a shared/<topic>/<YYYYMMDD-HHMM> branch, got {dep!r}"
         if cp["step"] not in ("setup", "analyze", "spec") and branch is None:
             warn(f"{folder.name}: step {cp['step']} but no migration branch recorded in checkpoint.yml")
 
@@ -65,8 +65,8 @@ class TestCheckpoint:
         cp = _load(folder)
         if cp["step"] in ("pr_review", "done"):
             assert prs.get("migration"), f"step {cp['step']} needs prs.migration"
-        if str(cp.get("base", "main")).startswith("shared/") and cp["step"] in ("pr_review", "done"):
-            assert prs.get("shared"), "stacked on a shared branch, so prs.shared is needed too"
+        if cp.get("depends_on") and cp["step"] in ("pr_review", "done"):
+            assert prs.get("shared"), "depends on an unmerged shared branch, so prs.shared (its PR) is needed too"
 
     def test_updated(self, folder):
         upd = _load(folder).get("updated") or {}
@@ -127,7 +127,7 @@ class TestCheckpoint:
             warn(f"{folder.name}: needs_input components not listed in checkpoint blocked_on: {missing}")
 
     def test_checkpoint_belongs_to_current_branch(self, folder):
-        """On a migration branch, its pattern's checkpoint must name that branch and its stack base."""
+        """On a migration branch, its pattern's checkpoint must name that branch and the shared branch merged into it."""
         branch = current_branch()
         m = parse_branch(branch) if branch else None
         if not (m and branch.startswith("migrate/") and m.group("pattern") == folder.name):
@@ -135,6 +135,9 @@ class TestCheckpoint:
         cp = _load(folder)
         assert cp.get("branch") == branch, \
             f"checkpoint.yml branch is {cp.get('branch')!r} but you are on {branch} - update the checkpoint"
-        expected_base = stack_base(branch).removeprefix("origin/")
-        assert cp.get("base") == expected_base, \
-            f"checkpoint.yml base is {cp.get('base')!r} but {branch} is stacked on {expected_base}"
+        base = shared_base(branch)
+        expected = None if base == MAIN else base.removeprefix("origin/")
+        assert cp.get("depends_on") == expected, (
+            f"checkpoint.yml depends_on is {cp.get('depends_on')!r} but {branch} has "
+            + (f"merged in unmerged {expected}" if expected else "no unmerged shared branch merged in (use null)")
+        )

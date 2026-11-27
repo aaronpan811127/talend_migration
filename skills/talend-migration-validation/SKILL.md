@@ -87,10 +87,10 @@ Append to `<root>/migration/<pattern>/validation_results.md` (create if missing)
 
 When every job in the pattern passes (ideally on 2-3 business dates), set those rows in `migration/<pattern>/jobs.csv` to `ready_for_review`.
 
-## Step 7 - Update the stacked PRs
+## Step 7 - Update the PRs
 
-* With the user's OK, commit `validation_results.md`, `jobs.csv`, the checkpoint (`step: pr_review` once the PRs are open, with `prs` filled in) and any fixes to the pattern's migration branch (`<pattern>: validation PASS on <dates>`); shared fixes go to its shared branch and are then merged into the migration branch. Merge `origin/main` into the top branch, rerun `pytest tests/static tests/patterns/<pattern>`, and push.
-* Open or update the stacked PRs (shared -> `main`, migration -> shared branch or `main`) as in conventions, Git and environments: agents with `gh` create them; in Genie Code give the user the compare links. Fill the body from `.github/pull_request_template.md` with the open components, test output, dev run URLs and reconciliation results. A human reviews and merges, bottom first.
+* With the user's OK, commit `validation_results.md`, `jobs.csv`, the checkpoint (`step: pr_review` once the PRs are open, with `prs` filled in) and any fixes to the pattern's migration branch (`<pattern>: validation PASS on <dates>`); shared fixes go to its shared branch and are then merged into the migration branch. Merge `origin/main` into the migration branch, rerun `pytest tests/static tests/patterns/<pattern>`, and push.
+* Open or update the PRs - shared and migration, both into `main` (conventions, PRs): agents with `gh` create them; in Genie Code give the user the compare links. Fill the body from `.github/pull_request_template.md` with what it depends on, the open components, test output, dev run URLs and reconciliation results. A human reviews and merges, shared PRs first.
 
 ## Do not
 

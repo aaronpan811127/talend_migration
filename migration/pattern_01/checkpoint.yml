@@ -3,7 +3,7 @@
 # Format and rules: skills/talend-pattern-migration/references/conventions.md#checkpoint
 pattern: pattern_01
 branch: null            # migrate/pattern_01/<YYYYMMDD-HHMM> this work lives on; null = no migration branch yet
-base: main              # main, or the shared/<topic>/<YYYYMMDD-HHMM> branch the migration branch is stacked on
+depends_on: null        # unmerged shared/<topic>/<YYYYMMDD-HHMM> branch merged into the migration branch, else null
 prs:
   shared: null          # PR number (e.g. 12) or URL once opened
   migration: null

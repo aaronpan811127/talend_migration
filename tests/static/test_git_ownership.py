@@ -1,8 +1,8 @@
 """Branch rules from conventions.md (Git and environments), checked with git.
 
 * Branch names: migrate/pattern_NN/<YYYYMMDD-HHMM> and shared/<topic>/<YYYYMMDD-HHMM> (UTC creation time).
-* A migrate branch may only change its pattern's files, compared with its stack base: the closest
-  shared/... branch it is stacked on, else origin/main. Shared commits underneath are not counted.
+* A migrate branch may only change its pattern's files, compared with origin/main. Commits from an
+  unmerged shared/... branch it merged in (it depends on that shared PR) are not counted.
 * A shared branch touching pattern files is a warning.
 Skipped when git or origin/main isn't available.
 """
@@ -10,7 +10,7 @@ import fnmatch
 
 import pytest
 
-from project import MAIN, current_branch, git, parse_branch, stack_base, warn
+from project import MAIN, current_branch, git, parse_branch, shared_base, warn
 
 
 def owned_globs(pattern: str) -> list:
@@ -70,11 +70,11 @@ def test_pattern_branch_only_changes_its_pattern():
     if not (m and branch.startswith("migrate/")):
         pytest.skip("not a migrate/... branch")
     _require_main()
-    pattern, base = m.group("pattern"), stack_base(branch)
+    pattern, base = m.group("pattern"), shared_base(branch)
     outside = [f for f in _changed_files(base) if not is_owned(f, owned_globs(pattern))]
     assert not outside, (
         f"{branch} may only change {pattern}'s files (compared with {base}). Put shared changes on a "
-        f"shared/<topic>/... branch and stack this branch on it: {outside}"
+        f"shared/<topic>/... branch with its own PR (merge it in here if you need it): {outside}"
     )
 
 
@@ -83,7 +83,7 @@ def test_shared_branch_leaves_pattern_files_alone():
     if not (parse_branch(branch) and branch.startswith("shared/")):
         pytest.skip("not a shared/... branch")
     _require_main()
-    touched = [f for f in _changed_files(stack_base(branch)) if is_owned(f, PATTERN_FILE_GLOBS)]
+    touched = [f for f in _changed_files(shared_base(branch)) if is_owned(f, PATTERN_FILE_GLOBS)]
     if touched:
         warn(f"shared branch changes pattern-owned files - get each pattern owner's OK in the PR: {touched}")
 
