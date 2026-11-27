@@ -1,5 +1,7 @@
 # Conventions for parallel migration work
 
+The single source for how the work is done - ownership, Git, checkpoint, hand-over, Snowflake, review. `AGENTS.md` and the skills are short entry points that link here; change procedures here, not there.
+
 ## Ownership (avoids merge conflicts)
 
 Each pattern has exactly one owner (see `migration/pattern_NN/jobs.csv`). The owner, and their agent, only touch:
@@ -53,7 +55,7 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `done` | short sentences: what is finished |
 | `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
 | `blocked_on` | optional: `needs_input` components or other blockers |
-| `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over: `id` (Omnigent session id, or `genie-code` / `manual`), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
+| `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over: `id` (the Omnigent session id given in the session's prompt, or `genie-code` / `manual`), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
 | `notes` | optional free text |
 
 No scripts are needed: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `depends_on` match the branch you're on and the shared branch merged into it, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
@@ -75,14 +77,20 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
 5. `components.yml`: every `needs_input` and `deferred` item.
 6. `validation_results.md`, if it exists.
 7. Review feedback on the open PRs (`prs` in the checkpoint): `gh pr view <n> --comments`, plus `gh pr checks <n>`.
-8. Summarize the state in a few lines (where it stands, what you'll do next, what's blocked) - as your first report, or to the user in Genie Code - then continue from `next`.
+8. Summarize the state in a few lines (where it stands, what you'll do next, what's blocked) - as your first report, or to the user in Genie Code - then continue from `next`. Don't redo or reverse anything listed in `done` or `## Decisions` without saying why.
 
 **Hand over (before every stop, including when blocked or out of time):**
 
 1. Commit what you have, even half done: `pattern_NN: WIP <what>` - never leave work uncommitted.
-2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append your `sessions` entry.
+2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append your `sessions` entry:
+   ```yaml
+   - id: <Omnigent session id from your prompt, or genie-code / manual>
+     by: <session name or person>
+     at: <UTC now, YYYY-MM-DDTHH:MMZ>
+     summary: <one line: what this session did and where it stopped>
+   ```
 3. Add any decision you made or were given to `## Decisions`.
-4. Run `pytest tests/static tests/patterns/pattern_NN`, push.
+4. Run `pytest tests/static tests/patterns/pattern_NN`, push, and open or update the PRs (below).
 
 **Forking a previous session (for people starting a session).** A fresh session plus the resume procedure is the default - the repo carries the state. When the last session stopped in the middle of something whose reasoning matters (a half-finished tMap translation, a debugging thread), you can start the next session as a fork of it with the Omnigent CLI, `omnigent run --fork <session id>`, taking the id from the checkpoint's last `sessions` entry. You need access to that session (shared with you, or your own). A fork inherits the old chat but not newer pushes, so the forked session still runs the resume procedure. Agents can't read or fork other sessions themselves.
 
@@ -97,8 +105,31 @@ Every PR targets `main` - no stacking. A pattern is delivered as one migration P
 5. **After a shared PR merges,** merge `origin/main` into the migration branch, set `depends_on: null`, rerun the tests and push - the shared commits drop out of the migration PR's diff.
 6. **PR description** (`.github/pull_request_template.md`): what it depends on, open `needs_input` / `deferred` components, test output, dev run URLs, reconciliation results.
 7. **Checkpoint.** Record each new branch (`branch`, `depends_on`) and PR (`prs`) in `checkpoint.yml` as soon as it exists. Once the PRs are open, `step` stays `pr_review` while review fixes are pushed; merging is what finishes the branch (git and GitHub show it), so nobody commits to it afterwards.
+8. **CI.** After opening or updating a PR, check it with `gh pr checks <n>` and fix a red check before reporting done.
 
-Rules: commit small; run `pytest tests/static tests/patterns/pattern_NN` before every push; pull before you start and push before you stop, so the next session sees your work; push only your pattern's branches (and their shared branch); no force-push, no rebasing pushed commits, no deleting branches; agents create PRs but never approve or merge them. Creating PRs from a sandbox needs the `gh` CLI (or the GitHub API) with GitHub credentials provided by the session - never stored in the repo.
+Commands (an agent in a sandbox clone; Genie Code does the same with `runGit` and compare links):
+
+```
+TS=$(date -u +%Y%m%d-%H%M)
+git switch -c shared/<topic>/$TS origin/main          # only if shared files must change
+git add <shared files> && git commit -m "shared: <what>" && git push -u origin HEAD
+gh pr create --base main --title "shared: <topic>" --body-file <filled .github/pull_request_template.md>
+
+git switch -c migrate/pattern_NN/$TS origin/main       # or: git switch <open branch> && git pull
+git merge shared/<topic>/$TS                            # only if you need the unmerged shared change
+git add notebooks/pattern_NN migration/pattern_NN tests/patterns/pattern_NN resources/jobs/pattern_NN_*.job.yml
+git commit -m "pattern_NN: <what>" && git push -u origin HEAD
+gh pr create --base main --title "pattern_NN: <summary>" --body-file <filled template>   # "Depends on #<shared PR>" first if merged in
+gh pr checks <n>
+```
+
+Rules:
+
+* Commit small; stage only the files that belong on the branch (never `git add -A` blindly); run `pytest tests/static tests/patterns/pattern_NN` before every push.
+* Pull before you start and push before you stop, so the next session sees your work.
+* Push only your pattern's branches (and their shared branch). No force-push, no rebasing pushed commits, no deleting branches. Agents create PRs but never approve or merge them.
+* Staying current: `git fetch origin && git merge origin/main` (and merge the shared branch in again after it changes). Resolve conflicts in your pattern's files; stop and report conflicts in shared files you didn't change.
+* Creating PRs from a sandbox needs the `gh` CLI (or the GitHub API) with GitHub credentials provided by the session - never stored in the repo. Without them, push what you can and report the branch names and compare links: `https://github.com/aaronpan811127/talend_migration/compare/main...<branch>?expand=1`.
 
 ### Deploying
 

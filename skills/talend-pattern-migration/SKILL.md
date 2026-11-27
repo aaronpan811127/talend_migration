@@ -10,7 +10,7 @@ You are converting **one job family (pattern)** at a time inside the `talend_mig
 There is no parser or converter script. Each developer works out the conversion for their own pattern; help them by reading the Talend exports together and following the conventions and mapping references below. Do not write a generic Talend-to-Databricks converter; if a reusable helper emerges from your pattern, propose it as a shared change.
 
 Read before starting:
-* [references/conventions.md](references/conventions.md) - file ownership, naming, parameters, definition of done. **Always read.**
+* [references/conventions.md](references/conventions.md) - **the single source of the rules**: ownership, Git, checkpoint, decisions, resume and hand-over, Snowflake, review checklist, definition of done. **Always read.** This skill only adds the migration steps and what is specific to Genie Code; it links to conventions instead of repeating it.
 * [references/component-mapping.md](references/component-mapping.md) - Talend component and Java expression to PySpark / operator mapping.
 * [references/notebook-template.md](references/notebook-template.md) - required cell structure of a pattern notebook.
 
@@ -20,10 +20,12 @@ When conversion is finished, hand off to the `talend-migration-validation` skill
 
 * Bundle root (`<root>`) = the folder two levels above this skill folder (`<root>/skills/talend-pattern-migration`). Confirm `<root>/databricks.yml` has `bundle.name: talend_migration`.
 * Ask for the pattern id (`pattern_NN`, two digits) if it isn't given. Look it up in `<root>/migration/<pattern>/jobs.csv` to get the Talend jobs in that family and the owner. If the user is not the owner listed, tell them and stop unless they confirm.
-* `<root>` must be the user's own Git folder clone of `aaronpan811127/talend_migration`, not the reference checkout `/Workspace/Users/aaron.pan@databricks.com/talend_migration` and not a clone another session uses. Load the `git` skill and check the branch with `runGit` `status`.
-* Find the pattern's open branch (conventions, Git and environments): `runGit` `list_branches`, and look for unmerged `migrate/<pattern>/<YYYYMMDD-HHMM>` branches. If one exists, check it out, `pull`, and run the resume procedure (conventions, Resuming and handing over): checkpoint, the branch's commits since its base, `spec.md` (`## Decisions`, Open questions), open `components.yml` items, `validation_results.md`, and the PR comments (ask the user to paste them if needed, since Genie Code can't reach GitHub). Tell the user the state in a few lines and continue from `next`, skipping the steps marked done. If there is none, propose `migrate/<pattern>/<UTC YYYYMMDD-HHMM>` (plus `shared/<topic>/<UTC YYYYMMDD-HHMM>` if shared files must change; both from `origin/main`, and the shared branch merged into the migration branch if the pattern needs it before it's merged), confirm with the user, `pull` `main`, and create them with `runGit` `checkout`. Never create a plain `migrate/<pattern>` branch.
-* Keep `migration/<pattern>/checkpoint.yml` current (conventions, Checkpoint): update `step`, `done`, `next`, `blocked_on` and `updated` (UTC time, `by` = the user or session) at the end of every step below, and record new branches and PRs. Record every decision the user makes or confirms in the `## Decisions` table of `spec.md`.
-* Before the session ends, hand over (conventions, Resuming and handing over): with the user's OK, commit even unfinished work (`<pattern>: WIP ...`), append a `sessions` entry (`id: genie-code`, `by` = the user's email, `at`, one-line `summary`), and push.
+* Git follows [Working copy](references/conventions.md#working-copy), [Branches](references/conventions.md#branches) and [Resuming and handing over](references/conventions.md#resuming-and-handing-over). What is specific to Genie Code:
+  * `<root>` is the user's own Git folder clone, not the reference checkout. Load the `git` skill and use `runGit` (`status`, `list_branches`, `checkout`, `pull`, `diff`, `commit_and_push`).
+  * Ask the user before creating a branch, committing or pushing.
+  * Genie Code can't reach GitHub: ask the user to paste PR comments during the resume.
+  * Your `sessions` entry is `id: genie-code`, `by: <user's email>`.
+* Keep [the checkpoint](references/conventions.md#checkpoint) current after every step below, and record what the user decides in [Decisions](references/conventions.md#decisions).
 
 ## Step 1 - Read the Talend exports
 
@@ -52,7 +54,7 @@ Show the developer the list of files before creating them.
 
 ## Step 3 - Write the spec
 
-Fill in `migration/<pattern>/spec.md` from Step 1: flow (source -> steps -> targets), parameters (common vs per job), Snowflake objects and procedures touched, variances between jobs, open questions, and the `## Decisions` table (conventions, Decisions). Keep it short and factual - this is what reviewers and other teammates read.
+Fill in `migration/<pattern>/spec.md` from Step 1: flow (source -> steps -> targets), parameters (common vs per job), Snowflake objects and procedures touched, variances between jobs, open questions, and the `## Decisions` table ([Decisions](references/conventions.md#decisions)). Keep it short and factual - this is what reviewers and other teammates read.
 
 ## Step 4 - Convert the notebook
 
@@ -60,7 +62,7 @@ Read each notebook in `notebooks/<pattern>/` with `readAssetById`, then edit it 
 
 * Follow the cell structure in [notebook-template.md](references/notebook-template.md).
 * Every Talend context variable becomes a widget and a job parameter. Every connection becomes a secret scope lookup - never hard-code credentials, hosts or passwords.
-* Snowflake: build every config with `schema=p["snowflake_schema"]` and keep table parameters unqualified, so each developer's dev runs land in their own shadow schema (see conventions, Snowflake in dev).
+* Snowflake: build every config with `schema=p["snowflake_schema"]` and keep table parameters unqualified, so each developer's dev runs land in their own shadow schema (see [Snowflake in dev](references/conventions.md#snowflake-in-dev)).
 * Use operators from `src/operators` for all I/O and Snowflake calls. Do transformations (tMap, tFilterRow, tAggregateRow ...) inline with the PySpark DataFrame API using the mapping reference.
 * If an operator you need doesn't exist, **do not** write ad-hoc I/O in the notebook and do not edit `src/operators` silently. Tell the user it's a shared change (see conventions) and propose the function signature.
 * Translate tJava/tJavaRow code to PySpark, mark the cell title with `[REVIEW]`, and record it in `components.yml` as `mapping: manual` with that `notebook` and `cell`. It stays `needs_input` until a human reviews it and you add `reviewed_by`.
@@ -82,14 +84,12 @@ One file per Talend job: `resources/jobs/<pattern>_<talend_job_snake>.job.yml`, 
 ## Step 7 - Update status and hand off
 
 * Update `migration/<pattern>/jobs.csv` (`status` -> `validating`) and the checkpoint (`step: validate`, `next`).
-* Review the changes with `runGit` `diff`, then offer to commit and push: shared files to the shared branch (`shared: ...`), pattern files to the migration branch (`<pattern>: ...`). Only commit and push after the user agrees, and pass `files` so each commit contains only that branch's files.
-* PRs, both into `main` (no stacking): Genie Code can't call GitHub, so give the user the compare links that open them - `https://github.com/aaronpan811127/talend_migration/compare/main...<shared branch>?expand=1` and `.../compare/main...<migration branch>?expand=1` - with a body filled from `.github/pull_request_template.md`. If the migration branch merged in the shared branch, its body starts with "Depends on #<shared PR> - merge that first" and `depends_on` is set in the checkpoint.
+* Hand over and open the PRs as in [Resuming and handing over](references/conventions.md#resuming-and-handing-over) and [PRs](references/conventions.md#prs). Genie Code specifics: show `runGit` `diff` first; commit only with the user's OK, using `commit_and_push` with `files` so each commit holds only that branch's files; instead of `gh`, give the user the compare links from [PRs](references/conventions.md#prs) with a body filled from `.github/pull_request_template.md`.
 * Summarize: files changed, and every `needs_input` / `deferred` component with its reason. Then continue with the `talend-migration-validation` skill.
 
 ## Do not
 
-* Commit to `main`, force-push, rebase pushed branches, or push branches of other patterns.
-* End a session without committing and pushing an updated checkpoint, if the user agreed to push.
+* Break the Git rules in [PRs](references/conventions.md#prs) (no commits to `main`, no force-push or rebasing pushed branches, only this pattern's branches).
 * Edit another pattern's files, `databricks.yml`, `src/operators/*`, the shared tests (`tests/static`, `tests/unit`, `tests/project.py`, `tests/conftest.py`), or the skills, unless the user explicitly says this is a shared change.
 * Weaken or skip a static test to make it pass. If a rule doesn't fit your pattern, raise it as a shared change.
 * Deploy to `prod` or unpause schedules.

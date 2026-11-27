@@ -5,7 +5,7 @@ description: Validate a migrated Talend job family in the talend_migration bundl
 
 # Talend migration validation
 
-Validates one pattern (`pattern_NN`) converted with the `talend-pattern-migration` skill. Read `../talend-pattern-migration/references/conventions.md` first (ownership, dev Snowflake rules, definition of done).
+Validates one pattern (`pattern_NN`) converted with the `talend-pattern-migration` skill. Read [conventions.md](../talend-pattern-migration/references/conventions.md) first - the single source of the rules (ownership, Git, checkpoint, Snowflake in dev, review checklist, definition of done). This skill adds only the validation steps.
 
 `<root>` = the folder two levels above this skill (`<root>/skills/talend-migration-validation`).
 
@@ -20,7 +20,7 @@ Stop on any failed test and fix it (or hand back to the conversion skill). Repor
 ## Step 2 - Deploy and run in dev
 
 * Confirm the dev run writes to the developer's shadow schema: `snowflake_schema` resolves to `MIGRATION_DEV_<short_name>_<lane>` (check with `bundle validate -o json`), table parameters are unqualified, and the schema exists in Snowflake. If a stored procedure writes to fixed production tables, stop and tell the user.
-* `bundle deploy --target dev --var lane=<lane>`, then for each job `bundle run <job_key> --target dev --var lane=<lane>`. Use lane `main` for interactive work; when several agents deploy in parallel, each uses `--var lane=<its pattern_NN>` (see conventions). Override parameters with `--params key=value,...` for a specific business date or input folder.
+* `bundle deploy --target dev --var lane=<lane>`, then for each job `bundle run <job_key> --target dev --var lane=<lane>` - lanes as in [Deploying](../talend-pattern-migration/references/conventions.md#deploying). Override parameters with `--params key=value,...` for a specific business date or input folder.
 * If a run fails, load the `job-run-diagnosis` skill. Find the failing task (one per notebook in `notebooks/<pattern>/`), fix that notebook, rerun the tests, redeploy, rerun.
 * Note the run URL and the row counts from the notebook exit summary.
 
@@ -89,8 +89,7 @@ When every job in the pattern passes (ideally on 2-3 business dates), set those 
 
 ## Step 7 - Update the PRs
 
-* With the user's OK, commit `validation_results.md`, `jobs.csv`, the checkpoint (`step: pr_review` once the PRs are open, with `prs` filled in) and any fixes to the pattern's migration branch (`<pattern>: validation PASS on <dates>`); shared fixes go to its shared branch and are then merged into the migration branch. Merge `origin/main` into the migration branch, rerun `pytest tests/static tests/patterns/<pattern>`, and push.
-* Open or update the PRs - shared and migration, both into `main` (conventions, PRs): agents with `gh` create them; in Genie Code give the user the compare links. Fill the body from `.github/pull_request_template.md` with what it depends on, the open components, test output, dev run URLs and reconciliation results. A human reviews and merges, shared PRs first.
+* With the user's OK, commit `validation_results.md`, `jobs.csv` and the checkpoint (`step: pr_review` once the PRs are open) to the migration branch (`<pattern>: validation PASS on <dates>`), then hand over and open or update the PRs as in [Resuming and handing over](../talend-pattern-migration/references/conventions.md#resuming-and-handing-over) and [PRs](../talend-pattern-migration/references/conventions.md#prs). Put the dev run URLs and reconciliation results in the PR body. In Genie Code, give the user compare links instead of `gh`.
 
 ## Do not
 

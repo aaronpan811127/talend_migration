@@ -6,65 +6,32 @@ This is a Declarative Automation Bundle that migrates Talend jobs, grouped into 
 
 ## Your task is one pattern
 
-You work on exactly one `pattern_NN`, named in your prompt. If it isn't, ask. Other agents may be working on other patterns at the same time.
+You work on exactly one `pattern_NN`, named in your prompt (ask if it isn't). Other sessions may be working on other patterns, or may have worked on yours before you.
 
-Follow these files in order. They are written for Genie Code but apply to you as-is (tool names are mapped below):
+**The rules live in one place:** [conventions.md](skills/talend-pattern-migration/references/conventions.md). This file only says where to start and how to map the Genie Code skills to your tools. If anything here seems to disagree with conventions.md, conventions.md wins.
 
-1. `skills/talend-pattern-migration/SKILL.md` - analyze, set up files, spec, convert, job YAMLs, tests.
-2. `skills/talend-pattern-migration/references/conventions.md` - ownership, naming, parameters, Snowflake rules, review checklist, definition of done. **Read before changing anything.**
+Read, in this order:
+
+1. [conventions.md](skills/talend-pattern-migration/references/conventions.md) - **before changing anything.**
+2. `skills/talend-pattern-migration/SKILL.md` - the migration steps. Written for Genie Code; tool names are mapped below.
 3. `skills/talend-pattern-migration/references/component-mapping.md` and `skills/talend-pattern-migration/references/notebook-template.md`.
 4. `skills/talend-migration-validation/SKILL.md` - only when asked to validate.
 
-## Files you may change
+## Start of a session
 
-Only your pattern's files:
+1. Clone into your sandbox; never edit the reference Git folder or use `git worktree` ([Working copy](skills/talend-pattern-migration/references/conventions.md#working-copy)): `git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration`.
+2. Continue the pattern's open branch, or create one ([Branches](skills/talend-pattern-migration/references/conventions.md#branches)). If another session is still on it, stop and report.
+3. Run the resume procedure and report a short state summary ([Resuming and handing over](skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)).
 
-* `notebooks/pattern_NN/`
-* `resources/jobs/pattern_NN_*.job.yml`
-* `migration/pattern_NN/` (`jobs.csv`, `spec.md`, `components.yml`, `validation.yml`, `validation_results.md`, `talend/`)
-* `tests/patterns/pattern_NN/`
+## While you work
 
-Everything else is shared: `src/operators/`, `tests/static/`, `tests/unit/`, `tests/project.py`, `tests/conftest.py`, `pytest.ini`, `databricks.yml`, `skills/`, `notebooks/validate_pattern`, `AGENTS.md`, `.gitignore`, `.github/`. Make shared changes only on a shared branch (below), never on your migration branch, and only when the pattern can't be delivered without them (for example a missing operator). Keep them minimal and add unit tests in `tests/unit/`.
+* Change only your pattern's files ([Ownership](skills/talend-pattern-migration/references/conventions.md#ownership-avoids-merge-conflicts)). A shared change goes on its own shared branch and PR, only if the pattern can't be delivered without it, with unit tests ([PRs](skills/talend-pattern-migration/references/conventions.md#prs)).
+* After each step, update `migration/pattern_NN/checkpoint.yml` ([Checkpoint](skills/talend-pattern-migration/references/conventions.md#checkpoint)) and record decisions in `spec.md` ([Decisions](skills/talend-pattern-migration/references/conventions.md#decisions)).
+* Before every push: `pytest tests/static tests/patterns/pattern_NN`.
 
-## Git
+## Before you stop
 
-The repo is `https://github.com/aaronpan811127/talend_migration`, default branch `main`.
-
-Full rules: `skills/talend-pattern-migration/references/conventions.md`, section Git and environments.
-
-1. **Your own clone; continue the pattern's branch if it has one.** Don't edit the reference Git folder `/Workspace/Users/aaron.pan@databricks.com/talend_migration`, don't use `git worktree`, and don't share a clone with another session. Other sessions may have worked on this pattern before you - their progress is in the branch's `migration/pattern_NN/checkpoint.yml`.
-   ```
-   git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration && cd ~/talend_migration
-   git branch -r --no-merged origin/main --list 'origin/migrate/pattern_NN/*'   # open branches for your pattern
-   ```
-   * **One exists:** `git switch <newest one, without origin/>`, then follow the resume procedure below. If the checkpoint's `updated.at` or the branch's latest commit is very recent, another session may still be on it - stop and report instead of working in parallel.
-   * **None:** create new branches named by the current UTC time, `TS=$(date -u +%Y%m%d-%H%M)`: `MIGRATE=migrate/pattern_NN/$TS` and, only if you need a shared change, `SHARED=shared/<topic>/$TS`. Never create or push a plain `migrate/pattern_NN` or `shared/<topic>` branch.
-   * **Checkpoint:** update `migration/pattern_NN/checkpoint.yml` (format in conventions, section Checkpoint) after each step and always before you stop: `branch`, `depends_on`, `prs`, `step`, `updated` (UTC time and your session name), `done`, `next`, `blocked_on`, and your `sessions` entry. Commit it with your work and push, so the next session can pick up.
-2. **Shared change first (if needed):** `git switch -c $SHARED origin/main`, commit only shared files (`shared: <what>`), push, then `gh pr create --base main --head $SHARED --title "shared: <topic>" --body-file <filled .github/pull_request_template.md>`.
-3. **Migration branch:** `git switch -c $MIGRATE origin/main`. Commit small with `pattern_NN: <what>`; stage only your pattern's files, never `git add -A` blindly. Push, then `gh pr create --base main --head $MIGRATE --title "pattern_NN: <summary>"`. Every PR targets `main` - never stack PRs.
-4. **Building on an unmerged shared change** (now or later): `git merge $SHARED` into `$MIGRATE` (merge, never rebase), set `depends_on: $SHARED` in the checkpoint, and start the migration PR body with "Depends on #<shared PR> - merge that first". After the shared PR merges: `git merge origin/main`, set `depends_on: null`, push.
-5. **Before every push** run `pytest tests/static tests/patterns/pattern_NN`. `tests/static/test_git_ownership.py` fails if the migration branch changes anything outside your pattern (shared commits merged in from `$SHARED` don't count) or if a branch name is wrong.
-6. **Never** push to `main`, force-push, rebase pushed commits, delete branches, or approve or merge PRs - a human merges, shared PRs before the migration PRs that depend on them. If `gh` or GitHub credentials are missing, push what you can and report the branch names and the compare URLs (`https://github.com/aaronpan811127/talend_migration/compare/<base>...<head>`).
-7. **Staying current:** `git fetch origin`, then `git merge origin/main` into your branch (and merge `$SHARED` into `$MIGRATE` again after changing it). Resolve conflicts in your pattern's files; stop and report conflicts in shared files you didn't change.
-
-## Resume and hand over
-
-You get nothing from earlier sessions except what they pushed - not their chat, not their sandbox. Full procedure: conventions, section Resuming and handing over.
-
-**At the start,** before changing anything, read in this order: `migration/pattern_NN/checkpoint.yml` (`step`, `next`, `blocked_on`, last `sessions` entries); `git log --oneline origin/main..HEAD`; `spec.md` (`## Decisions` and Open questions); `needs_input` / `deferred` items in `components.yml`; `validation_results.md` if present; PR feedback with `gh pr view <n> --comments` and `gh pr checks <n>`. Then report a short summary of the state and continue from `next`. Don't redo or reverse anything listed in `done` or `## Decisions` without saying why.
-
-**Before you stop** - finished, blocked, or out of time:
-
-1. Commit everything, even half done: `pattern_NN: WIP <what>`.
-2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append to `sessions`:
-   ```yaml
-   - id: <your Omnigent session id, from your prompt; else your session name>
-     by: <session name or person who started you>
-     at: <UTC now, YYYY-MM-DDTHH:MMZ>
-     summary: <one line: what this session did and where it stopped>
-   ```
-3. Add every decision you made or were given to the `## Decisions` table in `spec.md`.
-4. `pytest tests/static tests/patterns/pattern_NN`, then push.
+Finished, blocked or out of time: hand over ([Resuming and handing over](skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)) - commit even half-done work, update the checkpoint with your `sessions` entry (session id from your prompt), push - then open or update the PRs and check CI ([PRs](skills/talend-pattern-migration/references/conventions.md#prs)).
 
 ## Tool mapping (Genie Code -> you)
 
@@ -109,10 +76,14 @@ databricks bundle run <job_key> --target dev --var lane=pattern_NN
 
 ## Hard rules
 
+Repeated here on purpose - they are the ones that cause damage when missed. Details in conventions.md.
+
+* Only your pattern's files: `notebooks/pattern_NN/`, `resources/jobs/pattern_NN_*.job.yml`, `migration/pattern_NN/`, `tests/patterns/pattern_NN/`. Everything else is shared.
+* Every PR targets `main`. Never push to `main`, force-push, rebase pushed commits, delete branches, or approve or merge PRs.
 * Never deploy or run anything with `--target prod`. Never unpause schedules.
-* **Deploy and run only if your prompt says so, and only with `--var lane=pattern_NN` for your own pattern.** The lane gives you your own dev deploy folder (`~/.bundle/talend_migration/dev/pattern_NN`), job names (`[dev <user> pattern_NN] ...`) and Snowflake schema (`MIGRATION_DEV_<user>_pattern_NN`). Without it you deploy into the shared `main` lane and overwrite whoever else is using it.
+* **Deploy and run only if your prompt says so, and only with `--var lane=pattern_NN`** ([Deploying](skills/talend-pattern-migration/references/conventions.md#deploying)). Without it you deploy into the shared `main` lane and overwrite whoever else is using it.
 * Your Snowflake schema must exist before your first run; if a run fails because it doesn't, stop and report it - don't create schemas yourself.
-* Snowflake table and procedure parameters are unqualified (`STG_ORDERS`, `SP_TRANSFORM_ORDERS`); the schema comes from `snowflake_schema`. Never hard-code `MIGRATION_DEV...`, `ETL.` or other schema names.
+* Snowflake table and procedure parameters are unqualified (`STG_ORDERS`, `SP_TRANSFORM_ORDERS`); the schema comes from `snowflake_schema` ([Snowflake in dev](skills/talend-pattern-migration/references/conventions.md#snowflake-in-dev)). Never hard-code `MIGRATION_DEV...`, `ETL.` or other schema names.
 * No credentials, hosts or tokens in code or YAML - secret scopes only.
 * Anything you can't decide from the Talend export goes in `migration/pattern_NN/components.yml` as `status: needs_input` with the question in `reason`. Don't mark it `resolved` yourself.
 
