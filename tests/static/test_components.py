@@ -9,7 +9,7 @@ import pytest
 from project import COMPONENTS, ROOT, SKILLS, inventory_rows, load_yaml, wave_dirs, wave_notebooks, read_notebook, warn
 
 MAPPINGS = {"standard", "manual", "not_needed", "unsupported"}
-STATUSES = {"resolved", "needs_input", "deferred"}
+STATUSES = {"planned", "resolved", "needs_input", "deferred"}
 FIELDS = {"name", "type", "mapping", "implementation", "notebook", "cell", "status", "reason",
           "semantic_deltas", "reviewed_by", "jobs"}
 # Inventory statuses from which components.yml is required, and from which nothing may need input.
@@ -84,6 +84,10 @@ class TestComponents:
                 problems.append(f"{n}: unsupported components cannot be resolved - use needs_input or deferred")
             if status == "resolved" and mapping != "unsupported" and not str(c.get("implementation") or "").strip():
                 problems.append(f"{n}: resolved components need an implementation")
+            if status == "planned" and not str(c.get("implementation") or "").strip():
+                problems.append(f"{n}: planned components need implementation - the planned approach")
+            if status == "planned" and mapping == "unsupported":
+                problems.append(f"{n}: unsupported components can't be planned - use needs_input or deferred")
             if mapping == "manual" and status == "resolved" and "@" not in str(c.get("reviewed_by") or ""):
                 problems.append(f"{n}: manual mappings need reviewed_by (reviewer email) once resolved")
             if status in {"needs_input", "deferred"}:
@@ -121,8 +125,9 @@ class TestComponents:
         comps = self._load(folder).get("components") or []
         statuses = _inventory_statuses(folder.name)
         if statuses & NO_OPEN_INPUT_FROM:
-            open_items = [c["name"] for c in comps if c.get("status") == "needs_input"]
-            assert not open_items, f"jobs are {sorted(statuses & NO_OPEN_INPUT_FROM)} but components need input: {open_items}"
+            open_items = [f"{c['name']} ({c.get('status')})" for c in comps if c.get("status") in {"needs_input", "planned"}]
+            assert not open_items, \
+                f"jobs are {sorted(statuses & NO_OPEN_INPUT_FROM)} but components still need input or aren't built: {open_items}"
 
     def test_types_are_in_mapping_reference(self, folder):
         documented = _documented_types()

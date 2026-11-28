@@ -6,9 +6,8 @@ import re
 
 import pytest
 
-from project import CHECKPOINT, COMPONENTS, MAIN, current_branch, inventory_rows, load_yaml, parse_branch, wave_dirs, shared_base, warn
+from project import CHECKPOINT, COMPONENTS, MAIN, STEPS, current_branch, inventory_rows, load_yaml, parse_branch, wave_dirs, shared_base, warn
 
-STEPS = ["setup", "analyze", "spec", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
 FIELDS = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
 REQUIRED = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
 # Session ids are kept so a later session can be resumed (claude --resume) or forked (omnigent run --fork).

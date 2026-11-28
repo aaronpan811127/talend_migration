@@ -6,11 +6,26 @@ import re
 import pytest
 
 from project import (
-    JOBS_CSV, JOBS_CSV_FIELDS, LEARNINGS, MIGRATION, PROGRESS_FILES, PROMPT, SECRET_RX, SPEC, VALIDATION_YML, WAVE_RX, WAVE_SUBDIRS,
+    CHECKPOINT, COMPONENTS, JOBS_CSV, JOBS_CSV_FIELDS, LEARNINGS, MIGRATION, PREPARATION_STEPS, PROGRESS_FILES, PROMPT,
+    SECRET_RX, SIGN_OFF, SPEC, phase, VALIDATION_YML, WAVE_RX, WAVE_SUBDIRS,
     all_job_keys, inventory_rows, job_files, job_wave, load_yaml, wave_dirs, warn,
 )
 
 VALIDATION_ENTRIES = {"validation.yml", "results.md", "reports"}
+
+
+def _step(folder) -> str:
+    path = folder / CHECKPOINT
+    return str(load_yaml(path).get("step")) if path.is_file() else "setup"
+
+
+def _decision_rows(spec_text) -> list:
+    """Rows of the spec's ## Decisions table as [date, decision, why, decided_by] (header and separator skipped)."""
+    m = re.search(r"^## Decisions\s*$(.*?)(?=^## |\Z)", spec_text, flags=re.M | re.S)
+    rows = [l.strip() for l in (m.group(1) if m else "").splitlines() if l.strip().startswith("|")][2:]
+    return [cells for cells in ([c.strip() for c in r.strip("|").split("|")] for r in rows) if len(cells) == 4]
+
+
 LEARNING_RX = re.compile(r"^## (\d{4}-\d{2}-\d{2}) \S", flags=re.M)
 
 STATUSES = {"not_started", "analyzing", "converting", "validating", "ready_for_review", "done", "blocked"}
@@ -123,7 +138,43 @@ class TestWaveFolder:
         assert re.search(r"(?i)\bdon'?t deploy\b|\bmay deploy\b", prompt), \
             "prompt must say whether the session may deploy ('Don't deploy.' or 'You may deploy ... --var lane=...')"
         assert "--target prod" not in prompt, "never ask a session to use --target prod"
+        mode = re.search(r"^Mode: (preparation|conversion)\b", prompt, flags=re.M)
+        assert mode, "prompt needs a 'Mode: preparation' or 'Mode: conversion' line (conventions, Phases)"
+        step = _step(folder)
+        assert mode.group(1) == phase(step), \
+            f"prompt says Mode: {mode.group(1)} but checkpoint step '{step}' is the {phase(step)} phase - update prompt.md at the gate"
         assert not SECRET_RX.search(text), "no credentials in prompt.md"
+
+    def test_definition_of_ready(self, folder):
+        """From the gate (step ready) on, a wave runs autonomously, so Phase 1 must have closed every question
+        (conventions, Definition of ready). Fully checked at step ready; the sign-off and the empty open
+        questions stay required afterwards."""
+        step = _step(folder)
+        if step in PREPARATION_STEPS:
+            pytest.skip(f"Phase 1 (step {step}) - the gate is checked at step ready")
+        spec = (folder / SPEC).read_text()
+        problems = []
+        signed = [r for r in _decision_rows(spec) if r[1].lower().startswith(SIGN_OFF.lower()) and "@" in r[3]]
+        if not signed:
+            problems.append(f"## Decisions needs the sign-off row '{SIGN_OFF}', decided by a person (email)")
+        oq = re.search(r"^## Open questions\s*$(.*?)(?=^## |\Z)", spec, flags=re.M | re.S)
+        lines = [l.strip(" *-") for l in re.sub(r"<!--.*?-->", "", oq.group(1), flags=re.S).splitlines() if l.strip()] if oq else None
+        if lines != ["None"] and lines != ["None."]:
+            problems.append(f"spec.md '## Open questions' must say None once the wave is ready, found {lines}")
+        if step == "ready":
+            comps = (load_yaml(folder / COMPONENTS).get("components") or []) if (folder / COMPONENTS).is_file() else []
+            if not comps:
+                problems.append("progress/components.yml must list every component before the gate")
+            open_items = [c.get("name") for c in comps if c.get("status") == "needs_input"]
+            if open_items:
+                problems.append(f"components still need input: {open_items} - close them in Phase 1")
+            exports = [p.name for p in (folder / "inputs").glob("*.item")]
+            for r in [r for r in inventory_rows() if r["wave"] == folder.name]:
+                if not any(e.startswith(r["talend_job"]) for e in exports):
+                    problems.append(f"no inputs/{r['talend_job']}*.item export for {r['talend_job']}")
+                if not r["job_key"] or "@" not in (r["owner"] or ""):
+                    problems.append(f"{r['source']}: job_key and owner email are needed before the gate")
+        assert not problems, problems
 
     def test_learnings_log(self, folder):
         """learnings/learnings.md: entries '## YYYY-MM-DD <title>', oldest first, each with a 'Promoted:' line."""

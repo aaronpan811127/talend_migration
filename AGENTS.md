@@ -47,7 +47,7 @@ Finished, blocked or out of time: hand over ([Resuming and handing over](.claude
 | `runDatabricksCli` `<args>` | `databricks <args>` from the repo root |
 | load the `notebook-authoring` skill | Follow the Notebooks section below |
 | load the `job-run-diagnosis` skill | `databricks jobs get-run <run_id>` and `databricks jobs get-run-output <task_run_id>`; read the error and the failing cell |
-| "ask the user" / "tell the user" | Stop and report back to whoever started you; don't guess |
+| "ask the user" / "tell the user" | Phase 1 (`Mode: preparation` in the wave's `prompt.md`): ask the person in the session, or stop and report back; don't guess. Phase 2 (`Mode: conversion`): don't stop - record the question as `needs_input`, add it to `blocked_on`, continue ([Phases](.claude/skills/talend-wave-migration/references/conventions.md#phases)) |
 
 ## Notebooks
 

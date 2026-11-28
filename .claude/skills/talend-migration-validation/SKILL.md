@@ -34,7 +34,7 @@ Stop on any failed test and fix it (or hand back to the conversion skill). Repor
 
 ## Step 3 - Prepare the comparison
 
-Talend and Databricks must process **the same input** (same files / business date / source snapshot). Ask the user which Talend run to compare against if it isn't recorded.
+Talend and Databricks must process **the same input** (same files / business date / source snapshot). Which Talend runs to compare against is agreed in Phase 1 and recorded in `spec.md` or `validation/validation.yml`. Validation runs in Phase 2 (autonomous): if it isn't recorded, don't wait - add a `needs_input` item with the question, note it in `blocked_on`, and validate what you can.
 
 Edit `<root>/migration/<wave>/validation/validation.yml` - one check per target the jobs write (Snowflake tables, S3 outputs, tables changed by stored procedures):
 
@@ -97,7 +97,7 @@ When every job in the wave passes (ideally on 2-3 business dates), set those row
 
 ## Step 7 - Update the PRs
 
-* With the user's OK, commit `validation/results.md`, `jobs.csv` and the checkpoint (`step: pr_review` once the PRs are open) to the migration branch (`<wave>: validation PASS on <dates>`), then hand over and open or update the PRs as in [Resuming and handing over](../talend-wave-migration/references/conventions.md#resuming-and-handing-over) and [PRs](../talend-wave-migration/references/conventions.md#prs). Put the dev run URLs and reconciliation results in the PR body. In Genie Code, give the user compare links instead of `gh`.
+* Commit (in Phase 2 without asking) `validation/results.md`, `jobs.csv` and the checkpoint (`step: pr_review` once the PRs are open) to the migration branch (`<wave>: validation PASS on <dates>`), then hand over and open or update the PRs as in [Resuming and handing over](../talend-wave-migration/references/conventions.md#resuming-and-handing-over) and [PRs](../talend-wave-migration/references/conventions.md#prs). Put the dev run URLs and reconciliation results in the PR body. In Genie Code, give the user compare links instead of `gh`.
 
 ## Do not
 

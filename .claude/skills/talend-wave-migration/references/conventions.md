@@ -13,7 +13,7 @@ Everything about one wave except its notebooks, job YAMLs and tests lives in `mi
 | Path | Holds | Changes |
 | --- | --- | --- |
 | `spec.md` | the design: why these jobs are one wave, Talend jobs in scope, flow, parameters, Snowflake objects, variances between jobs, `## Decisions`, open questions | when the design or a decision changes |
-| `prompt.md` | the prompt that starts a session on this wave: one ```` ```text ```` block under `## Prompt` to paste into Omnigent, with the wave's own instructions (whether it may deploy, reviewers, notes about its jobs). No progress - that is in `progress/` | when the wave's instructions change |
+| `prompt.md` | the prompt that starts a session on this wave: one ```` ```text ```` block under `## Prompt` to paste into Omnigent, with a `Mode:` line (`preparation` in Phase 1, `conversion` from the gate on - [Phases](#phases)) and the wave's own instructions (whether it may deploy, reviewers, notes about its jobs). No progress - that is in `progress/` | at the gate, and when the wave's instructions change |
 | `inputs/` | what the work starts from: Talend `.item` exports (plus `.properties`), context files, sample data | when exports are added or refreshed |
 | `progress/jobs.csv` | the wave's jobs: `talend_job,job_key,owner,status,notes` ([Inventory](#inventory-migrationwave_nnprogressjobscsv)) | as jobs move through the statuses |
 | `progress/checkpoint.yml` | hand-over state between sessions ([Checkpoint](#checkpoint)) | after every step and before every stop |
@@ -33,6 +33,36 @@ Nothing else goes at the top of the wave folder, `progress/` holds only those th
 * One entry per learning, newest last: `## YYYY-MM-DD <short title>`, a few lines on what happened and what to do instead, and a `Promoted:` line.
 * **Promote what applies beyond this wave** on a shared branch: a mapping into `component-mapping.md`, a rule into these conventions, a helper into a skill script. Then set `Promoted:` to where it went (file, section or PR); otherwise `Promoted: no`.
 * Add learnings as part of hand-over, like decisions. A session resuming a wave reads them after the spec.
+
+## Phases
+
+Every wave runs in two phases. The first is interactive and makes the wave folder complete; the second is autonomous and converts every job from it.
+
+| Phase | Checkpoint `step` | Prompt `Mode:` | Who decides |
+| --- | --- | --- | --- |
+| **1 - Preparation** (interactive) | `setup`, `analyze`, `spec` | `preparation` | the session works with a person: reads the exports with them, asks every open question, records each answer in `## Decisions` |
+| **Gate** | `ready` | `conversion` | a person confirms the [Definition of ready](#definition-of-ready) |
+| **2 - Conversion** (autonomous) | `convert`, `job_yamls`, `tests`, `validate`, `pr_review`, `done` | `conversion` | the session, from the wave folder alone - it never waits for an answer |
+
+**In Phase 1,** ask rather than guess: every question about Talend behaviour, Snowflake objects, parameters, grouping or validation is closed now and written down - in `spec.md` (`## Decisions`, Flow, Parameters, Snowflake objects), `progress/components.yml` (a mapping and a planned implementation for every component) and `validation/validation.yml`. Phase 1 ends when the Definition of ready holds and a person adds the sign-off row to `## Decisions`: `| <date> | Ready for autonomous conversion | <why: questions closed> | <their email> |`. Then set `step: ready` and switch `prompt.md` to `Mode: conversion`.
+
+**In Phase 2,** don't ask and don't wait - nobody is there. Follow the wave folder and these conventions:
+
+* A choice the wave folder doesn't cover but that is low-risk and easy to reverse: make it, and record it in `## Decisions` with `Decided by` = `agent`.
+* Anything else - unclear Talend behaviour, a missing operator, a hand-translated tJava cell that needs review: mark that component `needs_input` with the question in `reason`, add it to `blocked_on`, and carry on with the other components and jobs.
+* Commit, push and open the PRs as in [PRs](#prs) without asking. Stop early only if nothing else can be done, and hand over with `blocked_on` saying why.
+* The person reviewing the PR answers the `needs_input` items; a later Phase 2 session picks the answers up from `## Decisions`.
+
+### Definition of ready
+
+Checked by `tests/static/test_migration_config.py` when `step` is `ready` (the sign-off row and the empty open questions from `ready` on):
+
+1. `inputs/` has a Talend `.item` export for every job in `progress/jobs.csv` (file name starting with the `talend_job` name), and every row has a `job_key` and an owner.
+2. `spec.md` is complete: why these jobs are one wave, Flow, Parameters, Snowflake objects, and `## Open questions` says `None`.
+3. `progress/components.yml` lists every component with a mapping, and none is `needs_input`: each is `planned` (mapping and planned implementation decided), `resolved` or `deferred` with a reason.
+4. `validation/validation.yml` has a check per target.
+5. `prompt.md` says `Mode: conversion` and whether the session may deploy.
+6. `## Decisions` has the sign-off row, decided by a person (an email).
 
 ## Ownership (avoids merge conflicts)
 
@@ -82,7 +112,7 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `branch` | the migration branch this work lives on (`migrate/wave_NN/<YYYYMMDD-HHMM>`), `null` before one exists |
 | `depends_on` | `null`, or the unmerged `shared/...` branch merged into the migration branch |
 | `prs` | `shared` and `migration`: PR number or URL once opened, else `null` |
-| `step` | `setup`, `analyze`, `spec`, `convert`, `job_yamls`, `tests`, `validate`, `pr_review`, or `done` (every job in `jobs.csv` is `done`, e.g. after cutover) |
+| `step` | Phase 1: `setup`, `analyze`, `spec`; gate: `ready`; Phase 2: `convert`, `job_yamls`, `tests`, `validate`, `pr_review`, or `done` (every job in `jobs.csv` is `done`, e.g. after cutover) - see [Phases](#phases) |
 | `updated` | `at` (UTC, `YYYY-MM-DDTHH:MMZ`) and `by` (session name or person) |
 | `done` | short sentences: what is finished |
 | `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
@@ -228,15 +258,15 @@ One file per wave, owned by the wave owner, with columns `talend_job,job_key,own
 | `name` | yes | Talend component instance, e.g. `tMap_1` (unique) |
 | `type` | yes | Talend component type, e.g. `tMap` |
 | `mapping` | yes | `standard` (a row of component-mapping.md), `manual` (hand-written, e.g. tJava), `not_needed`, `unsupported` |
-| `implementation` | when resolved | operator call or PySpark summary; for `not_needed`, why |
+| `implementation` | when planned or resolved | operator call or PySpark summary (for `planned`: the plan); for `not_needed`, why |
 | `notebook`, `cell` | `notebook` when a resolved `standard`/`manual` | notebook stem in `notebooks/wave_NN/` and exact cell title |
-| `status` | yes | `resolved`, `needs_input` (blocked on a human answer), `deferred` (accepted gap, out of scope for now) |
+| `status` | yes | `planned` (mapping and planned implementation decided in Phase 1, not built yet), `resolved` (implemented), `needs_input` (blocked on a human answer), `deferred` (accepted gap, out of scope for now) |
 | `reason` | for `needs_input` / `deferred` | the question to answer, or why it is deferred |
 | `semantic_deltas` | no | sentences describing behaviour that differs from Talend (types, nulls, ordering, error handling) - reviewers read these |
 | `reviewed_by` | `manual` + resolved | email of the human who reviewed the hand-written code |
 | `jobs` | no | Talend jobs that use it, if not all of the wave |
 
-Rules (`tests/static/test_components.py`): `unsupported` can't be `resolved`; `standard` types must appear in component-mapping.md (otherwise use `manual` or add the row as a shared change); every `[REVIEW]` cell is a `manual` component; no `needs_input` once a job is `ready_for_review` or `done`. `needs_input` and `deferred` items show as warnings on every test run.
+Rules (`tests/static/test_components.py`): `planned` components need `implementation` (the plan) and become `resolved` once built - none may be left `planned` or `needs_input` once a job is `ready_for_review` or `done`; `unsupported` can't be `resolved`; `standard` types must appear in component-mapping.md (otherwise use `manual` or add the row as a shared change); every `[REVIEW]` cell is a `manual` component; no `needs_input` once a job is `ready_for_review` or `done`. `needs_input` and `deferred` items show as warnings on every test run.
 
 ## Reusable scripts
 

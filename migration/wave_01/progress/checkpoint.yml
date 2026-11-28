@@ -7,15 +7,15 @@ depends_on: null        # unmerged shared/<topic>/<YYYYMMDD-HHMM> branch merged 
 prs:
   shared: null          # PR number (e.g. 12) or URL once opened
   migration: null
-step: convert           # setup | analyze | spec | convert | job_yamls | tests | validate | pr_review | done
+step: spec              # Phase 1: setup | analyze | spec; gate: ready; Phase 2: convert | job_yamls | tests | validate | pr_review | done
 updated:
-  at: 2026-11-27T11:15Z # UTC
+  at: 2026-11-28T10:51Z # UTC
   by: genie-code        # session name or person
 done:
   - Reference implementation - notebooks 01_extract_load and 02_transform, job wave_01_example, spec, components, validation config
 next:
-  - Put the real Talend exports for this wave in migration/wave_01/inputs/ and replace the placeholder job ExampleOrdersLoad
-  - Get answers for the needs_input components below from the Snowflake owner
+  - Phase 1 (interactive) - put the real Talend exports in migration/wave_01/inputs/ and replace the placeholder job ExampleOrdersLoad
+  - Close the needs_input components below with the Snowflake owner, and the spec's open questions; then go through the Definition of ready and the gate
 blocked_on:
   - tSnowflakeOutputBulkExec_1
   - tSnowflakeRow_1
@@ -29,3 +29,9 @@ sessions:
     by: aaron.pan@databricks.com
     at: 2026-11-27T11:15Z
     summary: Built the wave_01 reference (notebooks, job, spec, components, validation); first checkpoint and decisions
+  - omnigent_session_id: null
+    claude_session_id: null
+    harness: genie-code
+    by: aaron.pan@databricks.com
+    at: 2026-11-28T10:51Z
+    summary: Introduced Phase 1/Phase 2; wave_01 moved back to Phase 1 (step spec) because it still has open questions and needs_input components

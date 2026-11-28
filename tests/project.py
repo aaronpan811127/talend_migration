@@ -30,6 +30,17 @@ VALIDATION_RESULTS = "validation/results.md"  # recorded results
 VALIDATION_REPORTS = "validation/reports"     # generated reports (optional)
 LEARNINGS = "learnings/learnings.md"          # what this wave taught us
 WAVE_SUBDIRS = ("inputs", "progress", "validation", "scripts", "learnings")
+# Checkpoint steps in order (conventions.md, Phases): Phase 1 (interactive), the gate, Phase 2 (autonomous).
+STEPS = ["setup", "analyze", "spec", "ready", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
+PREPARATION_STEPS = {"setup", "analyze", "spec"}
+SIGN_OFF = "Ready for autonomous conversion"  # the Decisions row a person adds at the gate
+
+
+def phase(step) -> str:
+    """'preparation' (Phase 1, interactive) or 'conversion' (gate and Phase 2, autonomous) for a checkpoint step."""
+    return "preparation" if step in PREPARATION_STEPS else "conversion"
+
+
 PROGRESS_FILES = {"jobs.csv", "checkpoint.yml", "components.yml"}
 JOBS_CSV_FIELDS = ["talend_job", "job_key", "owner", "status", "notes"]
 
