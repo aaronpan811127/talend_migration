@@ -2,103 +2,35 @@
 
 Declarative Automation Bundle for migrating Talend jobs to Databricks, wave by wave. A **wave** (`wave_NN`) is a set of Talend jobs migrated together - grouped by job pattern, by dependencies, or by any other rule that suits the work.
 
+How the work is done - phases, Git, hand-over, Snowflake rules, review - is in the skills, and their rules in [conventions.md](.claude/skills/talend-wave-migration/references/conventions.md). This README only says what's where and how to get started.
+
 ## Layout
 
 ```
 talend_migration/
-├── databricks.yml                 # bundle config, variables, dev/prod targets
-├── pytest.ini, requirements-dev.txt  # test config and local/CI test dependencies
-├── AGENTS.md, CLAUDE.md           # instructions for other coding agents (Claude Code, Codex, Omnigent, ...)
-├── src/operators/                 # reusable Python primitives
-│   ├── config.py                  # SnowflakeConfig / JdbcConfig loaded from secret scopes
-│   ├── readers.py                 # read_files (S3/Volumes), read_table, read_jdbc, read_snowflake
-│   ├── writers.py                 # write_files, write_delta (append/merge), write_snowflake, write_jdbc
-│   ├── snowflake.py               # SnowflakeClient, call_procedure (stored procedures, bound params)
-│   └── validation.py              # compare_dataframes, run_from_config (Talend vs Databricks reconciliation)
-├── notebooks/
-│   ├── wave_01/                # one folder per wave (wave_01, wave_02, ...)
-│   │   ├── 01_extract_load        #   one notebook per job task, in run order
-│   │   └── 02_transform
-│   └── validate_wave           # runs migration/<wave>/validation/validation.yml
-├── resources/jobs/
-│   └── wave_01_example.job.yml # one file per migrated Talend job
-├── tests/                         # see tests/README.md
-│   ├── run_tests                  # notebook: runs pytest on Databricks
-│   ├── static/                    # static checks on code and configs (all waves, no Spark)
-│   ├── unit/operators/            # unit tests for src/operators
-│   └── waves/wave_NN/       # tests owned by each wave owner
-├── migration/
-│   └── wave_NN/                   # one folder per wave (see conventions, Wave folder)
-│       ├── spec.md                # design: why these jobs are one wave, flow, parameters, Snowflake objects, Decisions, open questions
-│       ├── prompt.md              # the prompt to paste when starting a session on this wave
-│       ├── inputs/                # Talend .item exports, context files, sample data
-│       ├── progress/
-│       │   ├── jobs.csv           # the wave's jobs: Talend job -> job key -> owner -> status
-│       │   ├── checkpoint.yml     # hand-over: branch, PRs, step, done, next, sessions - read first, update before stopping
-│       │   └── components.yml     # status of every Talend component (resolved / needs_input / deferred)
-│       ├── validation/
-│       │   ├── validation.yml     # reconciliation rules
-│       │   ├── results.md         # recorded results
-│       │   └── reports/           # generated reports (optional)
-│       ├── scripts/               # scripts only this wave needs (reusable ones go in a skill)
-│       └── learnings/
-│           └── learnings.md       # what this wave taught us; general lessons are promoted to the skills
-└── .claude/skills/                # agent skills (Genie Code, and discovered by Claude Code / Omnigent Claude sessions)
-    ├── talend-wave-migration/  # read exports -> set up files -> spec -> convert -> job YAMLs -> review checklist
-    │   ├── references/            # conventions, component mapping, notebook template
-    │   └── scripts/               # reusable conversion scripts (shared; changed on shared branches)
-    └── talend-migration-validation/  # review checklist -> dev run -> reconcile -> record
-        └── scripts/               # reusable validation scripts
+├── databricks.yml          # bundle config, variables, dev/prod targets
+├── AGENTS.md, CLAUDE.md    # entry point for coding agents
+├── .claude/skills/         # the skills: talend-wave-migration (with conventions), talend-migration-validation
+├── src/operators/          # reusable Python primitives: readers, writers, Snowflake, validation
+├── notebooks/wave_NN/      # one notebook per job task; notebooks/validate_wave runs a wave's validation
+├── resources/jobs/         # one job YAML per migrated Talend job
+├── migration/wave_NN/      # everything else about a wave (spec, prompt, inputs, progress, validation, ...)
+└── tests/                  # static, unit and per-wave tests - see tests/README.md
 ```
 
-## Working in parallel
+The package is named `operators` rather than `operator` so it doesn't shadow Python's built-in module.
 
-There is no upfront Talend-to-Databricks converter. Each developer works out the conversion for their own wave with Genie Code, using the conventions, component mapping and notebook template in `.claude/skills/talend-wave-migration/references/`. Reusable findings go back as shared changes: new operators in `src/operators/`, new mappings in the references, and reusable conversion scripts in the skills' `scripts/` folders (see Reusable scripts in the conventions).
+## Getting started
 
-1. Each session (an Omnigent sandbox session, or you in Genie Code) works in its own clone of `https://github.com/aaronpan811127/talend_migration` - in Omnigent inside the sandbox, in Genie Code your own Git folder; no worktrees, never a shared clone. A wave's work lives on one branch, `migrate/wave_NN/<YYYYMMDD-HHMM>` (UTC creation time), plus `shared/<topic>/<YYYYMMDD-HHMM>` if shared files must change. Sessions take turns on that branch and hand over through `migration/wave_NN/progress/checkpoint.yml`; a new branch is started only when the wave has no open one.
-2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/.claude/skills`. Both skills then load automatically. Claude harnesses (Claude Code, and Omnigent sessions on a Claude harness started in the repo clone) discover `.claude/skills` on their own and load the skills on demand; any other agent (Codex, Cursor, ...) reads `AGENTS.md`, which points to the same files.
-3. Claim your wave by creating `migration/wave_NN/progress/jobs.csv` (one file per wave, so owners never conflict), put the Talend exports in `migration/wave_NN/inputs/`, and ask Genie Code to "migrate wave_NN".
-4. The migration branch changes only your wave's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `.claude/skills/` or other shared files go on the wave's shared branch, with its own PR; the migration branch merges it in if it needs it before it's merged. See `.claude/skills/talend-wave-migration/references/conventions.md` (Git and environments).
-5. Run `tests/run_tests` (or `pytest tests/static tests/waves/wave_NN`) and fix failures before deploying.
-6. Deploy with `--target dev` only. Each deploy lands in a lane (default `main`) with its own folder, job names and Snowflake schema; parallel agents add `--var lane=wave_NN`.
-7. Ask Genie Code to "validate wave_NN". The agent pushes its branches and opens the PRs, all into `main` (no stacking): the shared PR if there is one, and the migration PR, marked "Depends on #<shared PR>" if it merged that branch in. A human reviews and merges them, shared PRs first.
+* **In Genie Code:** clone the repo into your own Git folder ([Working copy](.claude/skills/talend-wave-migration/references/conventions.md#working-copy)), add the skills (Customizations > Skills > New > Add from workspace folder, pick `<your clone>/.claude/skills`), then ask Genie Code to "migrate wave_NN".
+* **With a coding agent** (Omnigent, Claude Code, Codex, ...): start a session and paste the `## Prompt` block of `migration/wave_NN/prompt.md`; the agent follows `AGENTS.md`. To continue an earlier session instead, see [Resuming a previous session](.claude/skills/talend-wave-migration/references/conventions.md#resuming-a-previous-session).
+* **New wave:** the migration skill sets up its files from `wave_01`. Each wave starts with an interactive preparation phase before it runs on its own ([Phases](.claude/skills/talend-wave-migration/references/conventions.md#phases)).
 
-### Starting an Omnigent session for a wave
-
-A session only knows what earlier sessions pushed. It never sees their chat or sandbox. So:
-
-* **New or continuing wave (default): start a fresh session** in `<workspace-url>/omnigent` (host: Sandbox) and paste the `## Prompt` block of `migration/wave_NN/prompt.md` - each wave keeps its own prompt there, including whether it may deploy and anything a session must know up front. For a new wave, copy `migration/wave_01/prompt.md` and change the wave id and notes.
-* **Continuing a half-finished step whose reasoning matters:** use the ids in the last entry of `migration/wave_NN/progress/checkpoint.yml` `sessions` - `omnigent run --fork <omnigent_session_id>` from anywhere you can access that session, or `claude --resume <claude_session_id>` on the same `host` - then send the wave's prompt. The continued session still runs the resume procedure, because the branch may have moved on. Details: Resuming a previous session in the conventions.
-* Only one session per wave at a time. Check the checkpoint's `updated` time before starting one.
-
-Details: `.claude/skills/talend-wave-migration/references/conventions.md`, sections Checkpoint, Decisions, and Resuming and handing over.
-
-The package is named `operators` rather than `operator` so it doesn't shadow Python's built-in `operator` module.
-
-## How it fits together
-
-* Each **job YAML** sets job-level `parameters` (source path, target table, procedure name, and so on) and has one task per notebook in its **wave folder**, chained with `depends_on`.
-* Each **wave notebook** reads the parameters it needs as widgets, adds `src/` to `sys.path` (`src_path` defaults to `${workspace.file_path}/src`), and chains **operators** together.
-* To add a Talend job, copy a job YAML and change its parameters. To add a wave, create `notebooks/wave_NN/` starting from the notebooks in `notebooks/wave_01/`.
-
-## Prerequisites
+## Prerequisites (one-time setup)
 
 * Snowflake secret scope (default `snowflake-dev`) with keys `account`, `user`, `password`, `role`, `warehouse`, `database`.
-* Your own Snowflake shadow schema `MIGRATION_DEV_<short_name>_<lane>` in the dev database (e.g. `MIGRATION_DEV_aaron_pan_main`, plus `MIGRATION_DEV_aaron_pan_wave_NN` for each parallel agent lane). Dev jobs write there, so parallel developers and agents don't overwrite each other.
+* A Snowflake shadow schema per developer and lane in the dev database ([Snowflake in dev](.claude/skills/talend-wave-migration/references/conventions.md#snowflake-in-dev)).
 * Access to the S3 landing bucket through a Unity Catalog external location.
 * Update the `CHANGE-ME` values and workspace hosts in `databricks.yml`.
 
-## Deploy
-
-```
-pytest tests/static
-databricks bundle validate --target dev
-databricks bundle deploy --target dev                  # lane main
-databricks bundle run wave_01_example --target dev
-
-# a parallel agent working on wave_01
-databricks bundle deploy --target dev --var lane=wave_01
-databricks bundle run wave_01_example --target dev --var lane=wave_01
-```
-
-Prod is deployed only from `main`, after PR review.
+Deploying (dev only, one lane per wave) and testing: [Deploying](.claude/skills/talend-wave-migration/references/conventions.md#deploying) and `tests/README.md`. Prod is deployed only from `main`, after PR review.

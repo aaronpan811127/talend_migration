@@ -9,9 +9,11 @@ This repo migrates Talend jobs to Databricks, one wave (`wave_NN`, named in your
 * `.claude/skills/talend-wave-migration/SKILL.md` - migrate a wave. Start here; it tells you what to read next, including [conventions.md](.claude/skills/talend-wave-migration/references/conventions.md), the rules every session follows.
 * `.claude/skills/talend-migration-validation/SKILL.md` - validate a wave, when asked.
 
-Claude harnesses (Claude Code, Omnigent sessions on a Claude harness) discover these when the session starts in the repo clone: load them by name and read their `references/` files on demand. Other harnesses read the files at these paths. The skills are written for Genie Code; map their tools as below.
+Claude harnesses (Claude Code, Omnigent sessions on a Claude harness) discover these when the session starts in the repo clone: load them by name and read their `references/` files on demand. Other agents read the files at these paths.
 
-## Tool mapping (Genie Code -> you)
+## Tool mapping
+
+Some skill steps name specific tools. Use your equivalent:
 
 | Skill says | Do this |
 | --- | --- |

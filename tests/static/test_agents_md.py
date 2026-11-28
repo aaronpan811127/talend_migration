@@ -1,4 +1,4 @@
-"""Keep AGENTS.md (instructions for non-Genie agent harnesses) in sync with the repo."""
+"""Keep AGENTS.md (the entry point for coding agents) in sync with the repo."""
 import re
 from pathlib import Path
 
@@ -166,7 +166,7 @@ def test_names_the_snowflake_schema_parameter():
 
 
 # AGENTS.md only says how to load the skills and map their tools; migration instructions live in the skills.
-AGENTS_SECTIONS = {"Load the skills", "Tool mapping (Genie Code -> you)"}
+AGENTS_SECTIONS = {"Load the skills", "Tool mapping"}
 AGENTS_MAX_WORDS = 450
 
 
