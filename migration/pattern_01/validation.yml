@@ -1,5 +1,5 @@
 # Reconciliation checks: Talend output (expected) vs Databricks output (actual).
-# Run with notebooks/validate_pattern or operators.run_from_config. See skills/talend-migration-validation.
+# Run with notebooks/validate_pattern or operators.run_from_config. See .claude/skills/talend-migration-validation.
 # ${snowflake_schema} = the developer's dev shadow schema (MIGRATION_DEV_<short_name>_<lane>), filled in at run time.
 pattern: pattern_01
 snowflake_secret_scope: snowflake-dev

@@ -5,9 +5,9 @@ description: Validate a migrated Talend job family in the talend_migration bundl
 
 # Talend migration validation
 
-Validates one pattern (`pattern_NN`) converted with the `talend-pattern-migration` skill. Read [conventions.md](../talend-pattern-migration/references/conventions.md) first - the single source of the rules (ownership, Git, checkpoint, Snowflake in dev, review checklist, definition of done). This skill adds only the validation steps.
+Validates one pattern (`pattern_NN`) converted with the `talend-pattern-migration` skill. Read [conventions.md](../talend-pattern-migration/references/conventions.md) first - the single source of the rules (ownership, Git, checkpoint, Snowflake in dev, review checklist, definition of done). It belongs to the `talend-pattern-migration` skill: with a skill loader (Omnigent `read_skill_file`), read `references/conventions.md` **from that skill**, not via the `../` path, which loaders refuse. This skill adds only the validation steps.
 
-`<root>` = the folder two levels above this skill (`<root>/skills/talend-migration-validation`).
+`<root>` = the folder three levels above this skill (`<root>/.claude/skills/talend-migration-validation`).
 
 ## Step 1 - Review checks (no compute)
 

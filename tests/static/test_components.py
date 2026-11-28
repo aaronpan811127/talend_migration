@@ -1,12 +1,12 @@
 """Static checks on migration/<pattern>/components.yml (status of every Talend component).
 
-Rules: skills/talend-pattern-migration/references/conventions.md#component-status-file
+Rules: .claude/skills/talend-pattern-migration/references/conventions.md#component-status-file
 """
 import re
 
 import pytest
 
-from project import ROOT, inventory_rows, load_yaml, pattern_dirs, pattern_notebooks, read_notebook, warn
+from project import ROOT, SKILLS, inventory_rows, load_yaml, pattern_dirs, pattern_notebooks, read_notebook, warn
 
 MAPPINGS = {"standard", "manual", "not_needed", "unsupported"}
 STATUSES = {"resolved", "needs_input", "deferred"}
@@ -15,7 +15,7 @@ FIELDS = {"name", "type", "mapping", "implementation", "notebook", "cell", "stat
 # Inventory statuses from which components.yml is required, and from which nothing may need input.
 REQUIRED_FROM = {"converting", "validating", "ready_for_review", "done"}
 NO_OPEN_INPUT_FROM = {"ready_for_review", "done"}
-MAPPING_DOC = ROOT / "skills" / "talend-pattern-migration" / "references" / "component-mapping.md"
+MAPPING_DOC = SKILLS / "talend-pattern-migration" / "references" / "component-mapping.md"
 
 
 def _inventory_statuses(pattern):

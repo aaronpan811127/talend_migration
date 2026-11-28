@@ -1,11 +1,11 @@
 """Keep AGENTS.md (instructions for non-Genie agent harnesses) in sync with the repo."""
 import re
 
-from project import COMMON_PARAMS, ROOT, pattern_dirs
+from project import COMMON_PARAMS, CONVENTIONS, ROOT, SKILLS, pattern_dirs
 
 AGENTS = ROOT / "AGENTS.md"
-# Backticked repo paths, e.g. `skills/.../SKILL.md` or `notebooks/pattern_NN/`. pattern_NN is a placeholder.
-PATH_RX = re.compile(r"`((?:skills|src|tests|notebooks|resources|migration)/[^`\s*<>]*|[A-Za-z_-]+\.(?:md|ini|txt|yml))`")
+# Backticked repo paths, e.g. `.claude/skills/.../SKILL.md` or `notebooks/pattern_NN/`. pattern_NN is a placeholder.
+PATH_RX = re.compile(r"`((?:\.claude/skills|src|tests|notebooks|resources|migration)/[^`\s*<>]*|[A-Za-z_-]+\.(?:md|ini|txt|yml))`")
 
 
 def test_agents_md_exists():
@@ -39,15 +39,58 @@ def test_referenced_paths_exist():
 
 def test_mentions_every_skill():
     text = AGENTS.read_text()
-    skills = sorted(p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md"))
-    assert skills and all(f"skills/{s}/SKILL.md" in text for s in skills), f"AGENTS.md must point to every skill: {skills}"
+    skills = sorted(p.parent.name for p in SKILLS.glob("*/SKILL.md"))
+    assert skills and all(f".claude/skills/{s}/SKILL.md" in text for s in skills), f"AGENTS.md must point to every skill: {skills}"
+
+
+# ---------- skills stay discoverable by skill loaders (Claude Code, Omnigent Claude sessions) ----------
+
+FRONTMATTER_RX = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+MD_LINK_RX = re.compile(r"\]\(([^)#\s]+)(?:#[^)]*)?\)")
+
+
+def test_skills_live_in_agents_skills():
+    """Skills are in .claude/skills/ - where Claude harnesses discover them - and nowhere else."""
+    for old in ("skills", ".agents/skills"):
+        assert not (ROOT / old).exists(), f"skills belong in .claude/skills/, not {old}/ (only one copy, or they drift)"
+    assert sorted(p.parent.name for p in SKILLS.glob("*/SKILL.md")), "no skills found in .claude/skills/"
+    assert not SKILLS.is_symlink(), ".claude/skills must be a real folder (Omnigent rejects a symlinked skills root)"
+
+
+def test_skill_frontmatter():
+    """Each SKILL.md has name (= folder name, [a-z0-9-]+, as loaders require) and a description."""
+    problems = []
+    for path in sorted(SKILLS.glob("*/SKILL.md")):
+        m = FRONTMATTER_RX.match(path.read_text())
+        meta = dict(re.findall(r"^([a-z_-]+):\s*(.+)$", m.group(1), flags=re.M)) if m else {}
+        folder = path.parent.name
+        if meta.get("name") != folder:
+            problems.append(f"{folder}: frontmatter name {meta.get('name')!r} must equal the folder name")
+        if not re.fullmatch(r"[a-z0-9-]+", folder):
+            problems.append(f"{folder}: skill names must match [a-z0-9-]+")
+        if len(meta.get("description", "")) < 40:
+            problems.append(f"{folder}: needs a description (it is what loaders show to pick the skill)")
+    assert not problems, problems
+
+
+def test_skill_links_stay_inside_skills():
+    """Skill loaders only read files inside a skill, so a SKILL.md may link its own files or another skill's -
+    never other repo files."""
+    outside = []
+    for path in sorted(SKILLS.rglob("*.md")):
+        for target in MD_LINK_RX.findall(path.read_text()):
+            if "://" in target:
+                continue
+            resolved = (path.parent / target).resolve()
+            if not resolved.is_relative_to(SKILLS.resolve()):
+                outside.append(f"{path.relative_to(ROOT)} -> {target}")
+    assert not outside, f"links from skills to files outside .claude/skills/ (loaders can't read them): {outside}"
 
 
 # ---------- conventions.md is the single source; AGENTS.md and the skills link to it ----------
 
-CONVENTIONS = ROOT / "skills" / "talend-pattern-migration" / "references" / "conventions.md"
 LINK_RX = re.compile(r"conventions\.md#([A-Za-z0-9_-]+)")
-ENTRY_POINTS = [AGENTS, ROOT / "skills" / "talend-pattern-migration" / "SKILL.md"]
+ENTRY_POINTS = [AGENTS, SKILLS / "talend-pattern-migration" / "SKILL.md"]
 # Sections every entry point must link, so agents and Genie Code reach the same procedures.
 CORE_SECTIONS = {"working-copy", "branches", "checkpoint", "decisions", "resuming-and-handing-over", "prs"}
 # Procedure text that belongs only in conventions.md - finding it in an entry point means it was copied back.
@@ -76,7 +119,7 @@ def _anchors(path) -> set:
 
 
 def _docs():
-    files = [AGENTS, ROOT / "README.md", ROOT / "tests" / "README.md", *(ROOT / "skills").rglob("*.md"),
+    files = [AGENTS, ROOT / "README.md", ROOT / "tests" / "README.md", *SKILLS.rglob("*.md"),
              *(ROOT / "migration").rglob("*.yml"), *(ROOT / ".github").rglob("*.md")]
     return [f for f in files if f.is_file()]
 
@@ -99,7 +142,7 @@ def test_procedures_not_copied_into_entry_points():
     """Procedures live in conventions.md; AGENTS.md and the skills only link to them."""
     copies = sorted(
         f"{p.relative_to(ROOT)}: {phrase!r}"
-        for p in [AGENTS, *(ROOT / "skills").glob("*/SKILL.md")]
+        for p in [AGENTS, *SKILLS.glob("*/SKILL.md")]
         for phrase in CONVENTIONS_ONLY if phrase in p.read_text()
     )
     assert not copies, f"move these back to conventions.md and link to it instead: {copies}"

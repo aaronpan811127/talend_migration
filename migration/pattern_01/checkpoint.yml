@@ -1,6 +1,6 @@
 # Progress of this pattern's migration, so any session can pick up where the last one stopped.
 # Read it first; update and commit it after each step and before a session ends.
-# Format and rules: skills/talend-pattern-migration/references/conventions.md#checkpoint
+# Format and rules: .claude/skills/talend-pattern-migration/references/conventions.md#checkpoint
 pattern: pattern_01
 branch: null            # migrate/pattern_01/<YYYYMMDD-HHMM> this work lives on; null = no migration branch yet
 depends_on: null        # unmerged shared/<topic>/<YYYYMMDD-HHMM> branch merged into the migration branch, else null

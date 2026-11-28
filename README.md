@@ -36,7 +36,7 @@ talend_migration/
 │       ├── components.yml         # status of every Talend component (resolved / needs_input / deferred)
 │       ├── validation.yml         # reconciliation checks
 │       └── validation_results.md  # recorded results
-└── skills/                        # Genie Code skills for the agentic workflow
+└── .claude/skills/                # agent skills (Genie Code, and discovered by Claude Code / Omnigent Claude sessions)
     ├── talend-pattern-migration/  # read exports -> set up files -> spec -> convert -> job YAMLs -> review checklist
     │   └── references/            # conventions, component mapping, notebook template
     └── talend-migration-validation/  # review checklist -> dev run -> reconcile -> record
@@ -44,12 +44,12 @@ talend_migration/
 
 ## Working in parallel
 
-There is no automatic Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `skills/talend-pattern-migration/references/`. Reusable findings (new operators, new mappings) go back as shared changes.
+There is no automatic Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `.claude/skills/talend-pattern-migration/references/`. Reusable findings (new operators, new mappings) go back as shared changes.
 
 1. Each session (an Omnigent sandbox session, or you in Genie Code) works in its own clone of `https://github.com/aaronpan811127/talend_migration` - in Omnigent inside the sandbox, in Genie Code your own Git folder; no worktrees, never a shared clone. A pattern's work lives on one branch, `migrate/pattern_NN/<YYYYMMDD-HHMM>` (UTC creation time), plus `shared/<topic>/<YYYYMMDD-HHMM>` if shared files must change. Sessions take turns on that branch and hand over through `migration/pattern_NN/checkpoint.yml`; a new branch is started only when the pattern has no open one.
-2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/skills`. Both skills then load automatically. Other coding agents (Claude Code, Codex, Omnigent sub-agents) read `AGENTS.md`, which points them to the same skills.
+2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/.claude/skills`. Both skills then load automatically. Claude harnesses (Claude Code, and Omnigent sessions on a Claude harness started in the repo clone) discover `.claude/skills` on their own and load the skills on demand; any other agent (Codex, Cursor, ...) reads `AGENTS.md`, which points to the same files.
 3. Claim your pattern by creating `migration/pattern_NN/jobs.csv` (one file per pattern, so owners never conflict), put the Talend exports in `migration/pattern_NN/talend/`, and ask Genie Code to "migrate pattern_NN".
-4. The migration branch changes only your pattern's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `skills/` or other shared files go on the pattern's shared branch, with its own PR; the migration branch merges it in if it needs it before it's merged. See `skills/talend-pattern-migration/references/conventions.md` (Git and environments).
+4. The migration branch changes only your pattern's files - `tests/static/test_git_ownership.py` fails it otherwise. Changes to `src/operators`, `databricks.yml`, `.claude/skills/` or other shared files go on the pattern's shared branch, with its own PR; the migration branch merges it in if it needs it before it's merged. See `skills/talend-pattern-migration/references/conventions.md` (Git and environments).
 5. Run `tests/run_tests` (or `pytest tests/static tests/patterns/pattern_NN`) and fix failures before deploying.
 6. Deploy with `--target dev` only. Each deploy lands in a lane (default `main`) with its own folder, job names and Snowflake schema; parallel agents add `--var lane=pattern_NN`.
 7. Ask Genie Code to "validate pattern_NN". The agent pushes its branches and opens the PRs, all into `main` (no stacking): the shared PR if there is one, and the migration PR, marked "Depends on #<shared PR>" if it merged that branch in. A human reviews and merges them, shared PRs first.
@@ -63,7 +63,7 @@ A session only knows what earlier sessions pushed. It never sees their chat or s
 * **Continuing a half-finished step whose reasoning matters:** fork the last session listed in `migration/pattern_02/checkpoint.yml` (`sessions[-1].id`) with the Omnigent CLI, `omnigent run --fork <session id>`, then send the same prompt. The fork inherits that session's chat; it still runs the resume procedure, because the branch may have moved on. You need access to the session you fork.
 * Only one session per pattern at a time. Check the checkpoint's `updated` time before starting one.
 
-Details: `skills/talend-pattern-migration/references/conventions.md`, sections Checkpoint, Decisions, and Resuming and handing over.
+Details: `.claude/skills/talend-pattern-migration/references/conventions.md`, sections Checkpoint, Decisions, and Resuming and handing over.
 
 The package is named `operators` rather than `operator` so it doesn't shadow Python's built-in `operator` module.
 

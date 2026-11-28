@@ -18,7 +18,7 @@ When conversion is finished, hand off to the `talend-migration-validation` skill
 
 ## Step 0 - Locate the project and the pattern
 
-* Bundle root (`<root>`) = the folder two levels above this skill folder (`<root>/skills/talend-pattern-migration`). Confirm `<root>/databricks.yml` has `bundle.name: talend_migration`.
+* Bundle root (`<root>`) = the folder three levels above this skill folder (`<root>/.claude/skills/talend-pattern-migration`). Confirm `<root>/databricks.yml` has `bundle.name: talend_migration`.
 * Ask for the pattern id (`pattern_NN`, two digits) if it isn't given. Look it up in `<root>/migration/<pattern>/jobs.csv` to get the Talend jobs in that family and the owner. If the user is not the owner listed, tell them and stop unless they confirm.
 * Git follows [Working copy](references/conventions.md#working-copy), [Branches](references/conventions.md#branches) and [Resuming and handing over](references/conventions.md#resuming-and-handing-over). What is specific to Genie Code:
   * `<root>` is the user's own Git folder clone, not the reference checkout. Load the `git` skill and use `runGit` (`status`, `list_branches`, `checkout`, `pull`, `diff`, `commit_and_push`).

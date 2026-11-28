@@ -1,5 +1,5 @@
 """Static checks on migration/<pattern>/checkpoint.yml - the pattern's progress, shared by every session
-that works on its branch. Rules: skills/talend-pattern-migration/references/conventions.md#checkpoint
+that works on its branch. Rules: .claude/skills/talend-pattern-migration/references/conventions.md#checkpoint
 """
 import datetime
 import re

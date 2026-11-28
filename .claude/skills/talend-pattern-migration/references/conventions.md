@@ -12,7 +12,7 @@ Each pattern has exactly one owner (see `migration/pattern_NN/jobs.csv`). The ow
 | `resources/jobs/pattern_NN_*.job.yml` | pattern owner |
 | `migration/pattern_NN/**` | pattern owner |
 | `tests/patterns/pattern_NN/**` | pattern owner |
-| `src/operators/**`, `tests/unit/**`, `tests/static/**`, `tests/conftest.py`, `tests/project.py`, `pytest.ini`, `databricks.yml`, `skills/**`, `notebooks/validate_pattern`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `.github/**` | shared - platform owner reviews |
+| `src/operators/**`, `tests/unit/**`, `tests/static/**`, `tests/conftest.py`, `tests/project.py`, `pytest.ini`, `databricks.yml`, `.claude/skills/**`, `notebooks/validate_pattern`, `AGENTS.md`, `CLAUDE.md`, `.gitignore`, `.github/**` | shared - platform owner reviews |
 
 Shared changes go in their own small `shared/<topic>/...` branch and PR, separate from pattern work (see PRs below), and need a unit-style test or a dev run. Adding a new function is fine; changing an existing signature needs every pattern owner's sign-off.
 
@@ -27,7 +27,7 @@ A pattern's work lives on one migration branch until its PR merges. Several sess
 | Branch | Name | Changes | Created from | PR into |
 | --- | --- | --- | --- | --- |
 | Migration | `migrate/pattern_NN/<YYYYMMDD-HHMM>` | only that pattern's files | `origin/main` | `main` |
-| Shared | `shared/<topic>/<YYYYMMDD-HHMM>` | shared files (`src/operators`, `databricks.yml`, `skills/`, ...) | `origin/main` | `main` |
+| Shared | `shared/<topic>/<YYYYMMDD-HHMM>` | shared files (`src/operators`, `databricks.yml`, `.claude/skills/`, ...) | `origin/main` | `main` |
 
 * `<YYYYMMDD-HHMM>` is when the branch was created, in **UTC** (`date -u +%Y%m%d-%H%M`). `<topic>` is a short lowercase slug, e.g. `read-files-incremental`. Example: `migrate/pattern_01/20261127-1015`, which merged in `shared/read-files-incremental/20261127-1012` while that PR was open.
 * **Which branch to use.** At the start of a session: `git fetch origin`, then list the pattern's branches that aren't merged yet: `git branch -r --no-merged origin/main --list 'origin/migrate/pattern_NN/*'`. Continue the newest one, reading its checkpoint first. Create a new branch only if there is none.

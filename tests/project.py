@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 NOTEBOOKS = ROOT / "notebooks"
 JOBS = ROOT / "resources" / "jobs"
+# Agent skills, where Claude harnesses (Claude Code, Omnigent Claude sessions) discover them; Genie Code adds this folder.
+SKILLS = ROOT / ".claude" / "skills"
+CONVENTIONS = SKILLS / "talend-pattern-migration" / "references" / "conventions.md"
 MIGRATION = ROOT / "migration"  # one migration/pattern_NN/ folder per pattern
 JOBS_CSV = "jobs.csv"  # per-pattern inventory: migration/pattern_NN/jobs.csv
 JOBS_CSV_FIELDS = ["talend_job", "job_key", "owner", "status", "notes"]

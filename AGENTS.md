@@ -8,30 +8,32 @@ This is a Declarative Automation Bundle that migrates Talend jobs, grouped into 
 
 You work on exactly one `pattern_NN`, named in your prompt (ask if it isn't). Other sessions may be working on other patterns, or may have worked on yours before you.
 
-**The rules live in one place:** [conventions.md](skills/talend-pattern-migration/references/conventions.md). This file only says where to start and how to map the Genie Code skills to your tools. If anything here seems to disagree with conventions.md, conventions.md wins.
+**The rules live in one place:** [conventions.md](.claude/skills/talend-pattern-migration/references/conventions.md). This file only says where to start and how to map the Genie Code skills to your tools. If anything here seems to disagree with conventions.md, conventions.md wins.
+
+The skills live in `.claude/skills/`. Claude harnesses (Claude Code, and Omnigent sessions on a Claude harness) discover them on their own when the session starts in the repo clone: load `talend-pattern-migration` or `talend-migration-validation` by name and read their `references/` files on demand. Other harnesses (Codex, Cursor, ...) don't discover them - read the files at the paths below.
 
 Read, in this order:
 
-1. [conventions.md](skills/talend-pattern-migration/references/conventions.md) - **before changing anything.**
-2. `skills/talend-pattern-migration/SKILL.md` - the migration steps. Written for Genie Code; tool names are mapped below.
-3. `skills/talend-pattern-migration/references/component-mapping.md` and `skills/talend-pattern-migration/references/notebook-template.md`.
-4. `skills/talend-migration-validation/SKILL.md` - only when asked to validate.
+1. [conventions.md](.claude/skills/talend-pattern-migration/references/conventions.md) - **before changing anything.**
+2. `.claude/skills/talend-pattern-migration/SKILL.md` - the migration steps. Written for Genie Code; tool names are mapped below.
+3. `.claude/skills/talend-pattern-migration/references/component-mapping.md` and `.claude/skills/talend-pattern-migration/references/notebook-template.md`.
+4. `.claude/skills/talend-migration-validation/SKILL.md` - only when asked to validate.
 
 ## Start of a session
 
-1. Clone into your sandbox; never edit the reference Git folder or use `git worktree` ([Working copy](skills/talend-pattern-migration/references/conventions.md#working-copy)): `git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration`.
-2. Continue the pattern's open branch, or create one ([Branches](skills/talend-pattern-migration/references/conventions.md#branches)). If another session is still on it, stop and report.
-3. Run the resume procedure and report a short state summary ([Resuming and handing over](skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)).
+1. Clone into your sandbox; never edit the reference Git folder or use `git worktree` ([Working copy](.claude/skills/talend-pattern-migration/references/conventions.md#working-copy)): `git clone https://github.com/aaronpan811127/talend_migration ~/talend_migration`.
+2. Continue the pattern's open branch, or create one ([Branches](.claude/skills/talend-pattern-migration/references/conventions.md#branches)). If another session is still on it, stop and report.
+3. Run the resume procedure and report a short state summary ([Resuming and handing over](.claude/skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)).
 
 ## While you work
 
-* Change only your pattern's files ([Ownership](skills/talend-pattern-migration/references/conventions.md#ownership-avoids-merge-conflicts)). A shared change goes on its own shared branch and PR, only if the pattern can't be delivered without it, with unit tests ([PRs](skills/talend-pattern-migration/references/conventions.md#prs)).
-* After each step, update `migration/pattern_NN/checkpoint.yml` ([Checkpoint](skills/talend-pattern-migration/references/conventions.md#checkpoint)) and record decisions in `spec.md` ([Decisions](skills/talend-pattern-migration/references/conventions.md#decisions)).
+* Change only your pattern's files ([Ownership](.claude/skills/talend-pattern-migration/references/conventions.md#ownership-avoids-merge-conflicts)). A shared change goes on its own shared branch and PR, only if the pattern can't be delivered without it, with unit tests ([PRs](.claude/skills/talend-pattern-migration/references/conventions.md#prs)).
+* After each step, update `migration/pattern_NN/checkpoint.yml` ([Checkpoint](.claude/skills/talend-pattern-migration/references/conventions.md#checkpoint)) and record decisions in `spec.md` ([Decisions](.claude/skills/talend-pattern-migration/references/conventions.md#decisions)).
 * Before every push: `pytest tests/static tests/patterns/pattern_NN`.
 
 ## Before you stop
 
-Finished, blocked or out of time: hand over ([Resuming and handing over](skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)) - commit even half-done work, update the checkpoint with your `sessions` entry (session id from your prompt), push - then open or update the PRs and check CI ([PRs](skills/talend-pattern-migration/references/conventions.md#prs)).
+Finished, blocked or out of time: hand over ([Resuming and handing over](.claude/skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)) - commit even half-done work, update the checkpoint with your `sessions` entry (session id from your prompt), push - then open or update the PRs and check CI ([PRs](.claude/skills/talend-pattern-migration/references/conventions.md#prs)).
 
 ## Tool mapping (Genie Code -> you)
 
@@ -81,9 +83,9 @@ Repeated here on purpose - they are the ones that cause damage when missed. Deta
 * Only your pattern's files: `notebooks/pattern_NN/`, `resources/jobs/pattern_NN_*.job.yml`, `migration/pattern_NN/`, `tests/patterns/pattern_NN/`. Everything else is shared.
 * Every PR targets `main`. Never push to `main`, force-push, rebase pushed commits, delete branches, or approve or merge PRs.
 * Never deploy or run anything with `--target prod`. Never unpause schedules.
-* **Deploy and run only if your prompt says so, and only with `--var lane=pattern_NN`** ([Deploying](skills/talend-pattern-migration/references/conventions.md#deploying)). Without it you deploy into the shared `main` lane and overwrite whoever else is using it.
+* **Deploy and run only if your prompt says so, and only with `--var lane=pattern_NN`** ([Deploying](.claude/skills/talend-pattern-migration/references/conventions.md#deploying)). Without it you deploy into the shared `main` lane and overwrite whoever else is using it.
 * Your Snowflake schema must exist before your first run; if a run fails because it doesn't, stop and report it - don't create schemas yourself.
-* Snowflake table and procedure parameters are unqualified (`STG_ORDERS`, `SP_TRANSFORM_ORDERS`); the schema comes from `snowflake_schema` ([Snowflake in dev](skills/talend-pattern-migration/references/conventions.md#snowflake-in-dev)). Never hard-code `MIGRATION_DEV...`, `ETL.` or other schema names.
+* Snowflake table and procedure parameters are unqualified (`STG_ORDERS`, `SP_TRANSFORM_ORDERS`); the schema comes from `snowflake_schema` ([Snowflake in dev](.claude/skills/talend-pattern-migration/references/conventions.md#snowflake-in-dev)). Never hard-code `MIGRATION_DEV...`, `ETL.` or other schema names.
 * No credentials, hosts or tokens in code or YAML - secret scopes only.
 * Anything you can't decide from the Talend export goes in `migration/pattern_NN/components.yml` as `status: needs_input` with the question in `reason`. Don't mark it `resolved` yourself.
 

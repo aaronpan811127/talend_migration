@@ -1,5 +1,5 @@
 # Status of every Talend component in this pattern. Checked by tests/static/test_components.py.
-# Field reference: skills/talend-pattern-migration/references/conventions.md#component-status-file
+# Field reference: .claude/skills/talend-pattern-migration/references/conventions.md#component-status-file
 #
 # mapping: standard   - follows a row of references/component-mapping.md
 #          manual     - no standard mapping; hand-written (needs reviewed_by once resolved)
