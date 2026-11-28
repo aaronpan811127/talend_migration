@@ -16,6 +16,8 @@ done:
 next:
   - Phase 1 (interactive) - put the real Talend exports in migration/wave_01/inputs/ and replace the placeholder job ExampleOrdersLoad
   - Close the needs_input components below with the Snowflake owner, and the spec's open questions; then go through the Definition of ready and the gate
+attempts: 0             # consecutive Phase 2 sessions without progress (conventions, Retry limit)
+max_attempts: 3         # the wave's retry limit
 blocked_on:
   - tSnowflakeOutputBulkExec_1
   - tSnowflakeRow_1

@@ -64,6 +64,39 @@ Checked by `tests/static/test_migration_config.py` when `step` is `ready` (the s
 5. `prompt.md` says `Mode: conversion` and whether the session may deploy.
 6. `## Decisions` has the sign-off row, decided by a person (an email).
 
+### Retry limit
+
+Phase 2 runs unattended, so it is capped - a stuck wave stops instead of spending tokens:
+
+* **Within a session:** retry a failing action (a test fix, a dev run, a validation check) at most 3 times. Then record it as `needs_input` with what you tried, and move on.
+* **Per wave:** the checkpoint's `attempts` counts consecutive Phase 2 sessions that ended without progress - nothing new in `done`: no step advanced, no component resolved, no job status moved. A session with progress sets it to `0`; one without adds `1`.
+* **At the limit:** when `attempts` reaches `max_attempts` (set in Phase 1, default 3), the session adds `retry limit reached: <why>` to `blocked_on` and hands over. Later sessions check this first and stop without working. A person looks at it, records a decision in `## Decisions`, and resets `attempts: 0`.
+
+## Deterministic first
+
+Conversion should be repeatable: the same Talend export gives the same notebooks, job YAMLs and configs, whoever or whatever runs it. Use, in this order:
+
+1. **Operators and the mapping table** - functions in `src/operators` and rows of `component-mapping.md` (`mapping: standard`).
+2. **Scripts** - a skill's or the wave's `scripts/` ([Reusable scripts](#reusable-scripts)): code that reads the export and writes files, reviewed and tested once, then reused.
+3. **LLM-written code** - only where 1 and 2 don't cover it. It is `mapping: manual`, so a person reviews it (`reviewed_by`) before it is `resolved`.
+
+Record how each component was converted in `converted_by` (`operator`, `script:<name>` or `llm`; [Component status file](#component-status-file)). When the same LLM translation is needed a second time - another job, another wave - turn it into a mapping row or a script as a shared change instead of generating it again. Operators and scripts stay deterministic: no randomness, no timestamps or machine-specific values in generated files, no LLM calls.
+
+## Cost and performance
+
+Every agent session reports what it used, in the `usage` of its `sessions` entry ([Checkpoint](#checkpoint)):
+
+| Field | Meaning |
+| --- | --- |
+| `started` | UTC time the session started (`YYYY-MM-DDTHH:MMZ`) - note it when you begin the resume procedure |
+| `duration_min` | minutes from `started` to the hand-over (`at`) |
+| `input_tokens`, `output_tokens` | token counts, if your harness reports them; else `null` |
+| `cost_usd` | the session's cost, if your harness reports it (Claude Code reports a session total); else `null` |
+
+`sys_session_get_info` doesn't return token or cost totals; Omnigent shows them for each session, so a person can fill in a `null` later. Missing values show as a warning, not a failure.
+
+Job performance: each validation result records the dev run's duration ([talend-migration-validation](../../talend-migration-validation/SKILL.md), Record the result). The migration PR reports the wave's totals - sessions, duration, tokens, cost - and the run durations (`.github/pull_request_template.md`, Cost and performance).
+
 ## Ownership (avoids merge conflicts)
 
 Each wave has exactly one owner (see `migration/wave_NN/progress/jobs.csv`). The owner, and their agent, only touch:
@@ -116,8 +149,10 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `updated` | `at` (UTC, `YYYY-MM-DDTHH:MMZ`) and `by` (session name or person) |
 | `done` | short sentences: what is finished |
 | `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
-| `blocked_on` | optional: `needs_input` components or other blockers |
-| `sessions` | one entry per session that worked on the wave, oldest first, appended at hand-over - the ids let a later session be resumed or forked ([Resuming a previous session](#resuming-a-previous-session)): `omnigent_session_id` (from `sys_session_get_info`, `null` outside Omnigent), `claude_session_id` (the Claude Code session id, `null` for other harnesses), `harness` (`claude-code`, `codex`, `cursor`, `genie-code`, `manual`, ...), optional `host` (host or sandbox it ran on), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
+| `blocked_on` | optional: `needs_input` components or other blockers (including `retry limit reached: ...`) |
+| `attempts` | consecutive Phase 2 sessions without progress, `0` or more ([Retry limit](#retry-limit)) |
+| `max_attempts` | the wave's retry limit, set in Phase 1, default `3` |
+| `sessions` | one entry per session that worked on the wave, oldest first, appended at hand-over - the ids let a later session be resumed or forked ([Resuming a previous session](#resuming-a-previous-session)): `omnigent_session_id` (from `sys_session_get_info`, `null` outside Omnigent), `claude_session_id` (the Claude Code session id, `null` for other harnesses), `harness` (`claude-code`, `codex`, `cursor`, `genie-code`, `manual`, ...), optional `host` (host or sandbox it ran on), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`), and for agent sessions `usage` (`started`, `duration_min`, `input_tokens`, `output_tokens`, `cost_usd` - [Cost and performance](#cost-and-performance)) |
 | `notes` | optional free text |
 
 No tooling is needed for the checkpoint: edit the YAML and commit it with the work (`wave_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `depends_on` match the branch you're on and the shared branch merged into it, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
@@ -133,7 +168,7 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
 **Resume (start of every session),** in this order, before changing anything:
 
 1. `git fetch origin`; find the wave's open branch (see Branches); `git switch` to it and `git pull`.
-2. `migration/wave_NN/progress/checkpoint.yml`: `step`, `next`, `blocked_on`, and the last `sessions` entries.
+2. `migration/wave_NN/progress/checkpoint.yml`: `step`, `next`, `blocked_on`, `attempts`, and the last `sessions` entries. If `attempts` has reached `max_attempts`, stop and report - don't work on the wave ([Retry limit](#retry-limit)). Note the UTC time now as your `usage.started`.
 3. `git log --oneline origin/main..HEAD` - what earlier sessions changed (plus any shared commits merged in from `depends_on`).
 4. `spec.md`, especially `## Decisions` and Open questions, then `learnings/learnings.md`.
 5. `progress/components.yml`: every `needs_input` and `deferred` item.
@@ -144,7 +179,7 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
 **Hand over (before every stop, including when blocked or out of time):**
 
 1. Commit what you have, even half done: `wave_NN: WIP <what>` - never leave work uncommitted.
-2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append your `sessions` entry:
+2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, `attempts` (Phase 2: `0` if this session made progress, else one more), and append your `sessions` entry:
    ```yaml
    - omnigent_session_id: <sys_session_get_info with no arguments -> your session id, e.g. conv_...; null outside Omnigent>
      claude_session_id: <your Claude Code session id; null for other harnesses>
@@ -153,10 +188,16 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
      by: <session name or person>
      at: <UTC now, YYYY-MM-DDTHH:MMZ>
      summary: <one line: what this session did and where it stopped>
+     usage:                  # agent sessions (Cost and performance); unknown values: null
+       started: <UTC time the session started>
+       duration_min: <minutes>
+       input_tokens: <number or null>
+       output_tokens: <number or null>
+       cost_usd: <number or null>
    ```
 3. Add any decision you made or were given to `## Decisions`, and anything you learned to `learnings/learnings.md` ([Learnings](#learnings)).
 4. Run `pytest tests/static tests/waves/wave_NN`, push, and open or update the PRs (below).
-5. Report back to whoever started you: your branches and PR URLs and their merge order (or why you couldn't push or open them); the checkpoint you committed (`step`, `next`, your `sessions` entry) and the decisions you added; files changed; the output of the tests and `bundle validate`, and run URLs if you deployed; every `needs_input` / `deferred` component with its reason; any shared change you need.
+5. Report back to whoever started you: your branches and PR URLs and their merge order (or why you couldn't push or open them); the checkpoint you committed (`step`, `next`, your `sessions` entry) and the decisions you added; files changed; the output of the tests and `bundle validate`, and run URLs and durations if you deployed; your `usage` (duration, tokens, cost); every `needs_input` / `deferred` component with its reason; any shared change you need.
 
 ### Resuming a previous session
 
@@ -266,6 +307,7 @@ One file per wave, owned by the wave owner, with columns `talend_job,job_key,own
 | `reason` | for `needs_input` / `deferred` | the question to answer, or why it is deferred |
 | `semantic_deltas` | no | sentences describing behaviour that differs from Talend (types, nulls, ordering, error handling) - reviewers read these |
 | `reviewed_by` | `manual` + resolved | email of the human who reviewed the hand-written code |
+| `converted_by` | `resolved` (unless `not_needed`) | how it was converted ([Deterministic first](#deterministic-first)): `operator` (an operator or mapping-table row), `script:<name>`, or `llm` (needs `mapping: manual`) |
 | `jobs` | no | Talend jobs that use it, if not all of the wave |
 
 Rules (`tests/static/test_components.py`): `planned` components need `implementation` (the plan) and become `resolved` once built - none may be left `planned` or `needs_input` once a job is `ready_for_review` or `done`; `unsupported` can't be `resolved`; `standard` types must appear in component-mapping.md (otherwise use `manual` or add the row as a shared change); every `[REVIEW]` cell is a `manual` component; no `needs_input` once a job is `ready_for_review` or `done`. `needs_input` and `deferred` items show as warnings on every test run.

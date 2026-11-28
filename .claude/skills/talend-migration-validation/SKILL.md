@@ -89,7 +89,7 @@ Append to `<root>/migration/<wave>/validation/results.md` (create if missing):
 
 ```
 ## <YYYY-MM-DD> <job_key> - <PASS|FAIL>
-* Dev run: <run URL>; Talend run compared: <date / run id>; input: <business date or path>
+* Dev run: <run URL> (<duration, e.g. 14 min>; Talend run took <duration, if known>); Talend run compared: <date / run id>; input: <business date or path>
 | Check | Expected rows | Actual rows | Result | Notes |
 ```
 

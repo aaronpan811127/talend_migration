@@ -8,15 +8,48 @@ import pytest
 
 from project import CHECKPOINT, COMPONENTS, MAIN, STEPS, current_branch, inventory_rows, load_yaml, parse_branch, wave_dirs, shared_base, warn
 
-FIELDS = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
-REQUIRED = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
+REQUIRED = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions", "attempts", "max_attempts"}
+FIELDS = REQUIRED | {"blocked_on", "notes"}
+RETRY_LIMIT_PREFIX = "retry limit reached"
+# Usage an agent session reports (conventions, Cost and performance); numbers may be null if the harness doesn't say.
+USAGE_FIELDS = {"started", "duration_min", "input_tokens", "output_tokens", "cost_usd"}
 # Session ids are kept so a later session can be resumed (claude --resume) or forked (omnigent run --fork).
 SESSION_IDS = ("omnigent_session_id", "claude_session_id")
 SESSION_REQUIRED = {*SESSION_IDS, "harness", "by", "at", "summary"}
-SESSION_FIELDS = SESSION_REQUIRED | {"host", "url"}
+SESSION_FIELDS = SESSION_REQUIRED | {"host", "url", "usage"}
 NO_ID_HARNESSES = {"genie-code", "manual"}  # sessions with nothing to resume
 TIME_FMT = "%Y-%m-%dT%H:%MZ"
 PR_RX = re.compile(r"^(#?\d+|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+)$")
+
+
+def _usage_problems(i, s, folder) -> list:
+    """An agent session's usage: started/duration always, tokens and cost as numbers or null (null warns)."""
+    usage = s.get("usage")
+    if not isinstance(usage, dict):
+        return [f"entry {i}: agent sessions report usage {sorted(USAGE_FIELDS)} (conventions, Cost and performance)"]
+    problems = []
+    if set(usage) != USAGE_FIELDS:
+        problems.append(f"entry {i}: usage needs exactly {sorted(USAGE_FIELDS)}, got {sorted(usage)}")
+    try:
+        started = datetime.datetime.strptime(str(usage.get("started")), TIME_FMT)
+        at = datetime.datetime.strptime(str(s.get("at")), TIME_FMT)
+        if started > at:
+            problems.append(f"entry {i}: usage.started is after the hand-over time at")
+    except ValueError:
+        problems.append(f"entry {i}: usage.started must be UTC YYYY-MM-DDTHH:MMZ, got {usage.get('started')!r}")
+    dur = usage.get("duration_min")
+    if isinstance(dur, bool) or not isinstance(dur, (int, float)) or dur < 0:
+        problems.append(f"entry {i}: usage.duration_min must be minutes (a number >= 0), got {dur!r}")
+    unknown = []
+    for k in ("input_tokens", "output_tokens", "cost_usd"):
+        v = usage.get(k)
+        if v is None:
+            unknown.append(k)
+        elif isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+            problems.append(f"entry {i}: usage.{k} must be a number >= 0 or null, got {v!r}")
+    if unknown:
+        warn(f"{folder.name} sessions entry {i}: usage {unknown} unknown - fill them in from Omnigent if you can")
+    return problems
 
 
 def _statuses(wave):
@@ -108,6 +141,8 @@ class TestCheckpoint:
                 problems.append(f"entry {i}: {harness} session records no session id, so it can't be resumed or forked")
             if ids["claude_session_id"] and not s.get("host"):
                 warn(f"{folder.name} sessions entry {i}: claude_session_id without host - claude --resume only works there")
+            if harness and harness not in NO_ID_HARNESSES:
+                problems += _usage_problems(i, s, folder)
             if s.get("url") and not str(s["url"]).startswith("https://"):
                 problems.append(f"entry {i}: url must be an https link to the session")
             try:
@@ -121,6 +156,20 @@ class TestCheckpoint:
         except ValueError:
             return  # reported by test_updated
         assert times[-1] <= updated, "the last sessions entry is later than updated.at - update both at hand-over"
+
+    def test_retry_limit(self, folder):
+        """attempts counts Phase 2 sessions without progress; at max_attempts the wave says so in blocked_on."""
+        cp = _load(folder)
+        attempts, limit = cp.get("attempts"), cp.get("max_attempts")
+        assert isinstance(limit, int) and not isinstance(limit, bool) and 1 <= limit <= 10, \
+            f"max_attempts must be a whole number from 1 to 10 (default 3), got {limit!r}"
+        assert isinstance(attempts, int) and not isinstance(attempts, bool) and 0 <= attempts <= limit, \
+            f"attempts must be a whole number from 0 to max_attempts ({limit}), got {attempts!r}"
+        flagged = any(str(b).lower().startswith(RETRY_LIMIT_PREFIX) for b in cp.get("blocked_on") or [])
+        if attempts == limit:
+            assert flagged, f"attempts reached max_attempts ({limit}): add '{RETRY_LIMIT_PREFIX}: <why>' to blocked_on"
+        elif flagged:
+            warn(f"{folder.name}: blocked_on says the retry limit was reached but attempts is {attempts} of {limit}")
 
     def test_step_matches_jobs_csv(self, folder):
         cp, statuses = _load(folder), _statuses(folder.name)

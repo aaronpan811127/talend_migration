@@ -24,4 +24,15 @@
 - [ ] Reconciliation results (`migration/wave_NN/validation/results.md`), if validated
 - [ ] Shared PR: unit tests for changed operators; every wave owner whose files it touches has approved
 
+## Cost and performance
+
+<!-- Migration PR: totals over the wave's `sessions` in progress/checkpoint.yml (conventions, Cost and performance), plus dev run durations from validation/results.md. Write "unknown" where values are null. -->
+
+| Sessions | Duration (min) | Input tokens | Output tokens | Cost (USD) |
+| --- | --- | --- | --- | --- |
+| | | | | |
+
+* Components by `converted_by`: operator <n>, script <n>, llm <n>
+* Dev run durations (vs Talend, if known):
+
 Agents open this PR; a human reviews and merges it - shared PRs before the migration PRs that depend on them.

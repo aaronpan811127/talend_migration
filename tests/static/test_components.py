@@ -11,11 +11,17 @@ from project import COMPONENTS, ROOT, SKILLS, inventory_rows, load_yaml, wave_di
 MAPPINGS = {"standard", "manual", "not_needed", "unsupported"}
 STATUSES = {"planned", "resolved", "needs_input", "deferred"}
 FIELDS = {"name", "type", "mapping", "implementation", "notebook", "cell", "status", "reason",
-          "semantic_deltas", "reviewed_by", "jobs"}
+          "semantic_deltas", "reviewed_by", "converted_by", "jobs"}
+# How a component was converted (conventions, Deterministic first): operator / mapping row, a script, or an LLM.
+CONVERTED_BY_RX = re.compile(r"^(operator|llm|script:[A-Za-z0-9_.-]+)$")
 # Inventory statuses from which components.yml is required, and from which nothing may need input.
 REQUIRED_FROM = {"converting", "validating", "ready_for_review", "done"}
 NO_OPEN_INPUT_FROM = {"ready_for_review", "done"}
 MAPPING_DOC = SKILLS / "talend-wave-migration" / "references" / "component-mapping.md"
+
+
+def _script_exists(name, folder) -> bool:
+    return any(p.name == name or p.stem == name for p in [*SKILLS.glob("*/scripts/*"), *(folder / "scripts").glob("*")])
 
 
 def _inventory_statuses(wave):
@@ -86,6 +92,15 @@ class TestComponents:
                 problems.append(f"{n}: resolved components need an implementation")
             if status == "planned" and not str(c.get("implementation") or "").strip():
                 problems.append(f"{n}: planned components need implementation - the planned approach")
+            conv = c.get("converted_by")
+            if status == "resolved" and mapping != "not_needed" and not conv:
+                problems.append(f"{n}: resolved components record converted_by (operator, script:<name> or llm)")
+            if conv is not None and not CONVERTED_BY_RX.match(str(conv)):
+                problems.append(f"{n}: converted_by must be operator, script:<name> or llm, got {conv!r}")
+            if conv == "llm" and mapping != "manual":
+                problems.append(f"{n}: LLM-written code must be mapping: manual, so a person reviews it")
+            if str(conv).startswith("script:") and not _script_exists(str(conv)[len("script:"):], folder):
+                problems.append(f"{n}: converted_by {conv} - no such script in a skill's or the wave's scripts/")
             if status == "planned" and mapping == "unsupported":
                 problems.append(f"{n}: unsupported components can't be planned - use needs_input or deferred")
             if mapping == "manual" and status == "resolved" and "@" not in str(c.get("reviewed_by") or ""):

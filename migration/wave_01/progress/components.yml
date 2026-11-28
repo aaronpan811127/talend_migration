@@ -5,7 +5,8 @@
 #          manual     - no standard mapping; hand-written (needs reviewed_by once resolved)
 #          not_needed - no Databricks equivalent required (say why in implementation)
 #          unsupported- no migration path yet (cannot be resolved)
-# status:  resolved | needs_input | deferred   (needs_input / deferred need a reason)
+# status:  planned | resolved | needs_input | deferred   (needs_input / deferred need a reason)
+# converted_by (resolved): operator | script:<name> | llm   (llm needs mapping: manual - conventions, Deterministic first)
 wave: wave_01
 components:
   - name: tS3Connection_1
@@ -21,6 +22,7 @@ components:
     notebook: 01_extract_load
     cell: "Extract: read landed files from S3"
     status: resolved
+    converted_by: operator
     semantic_deltas:
       - Column types are inferred as strings; Talend applied its schema types on read.
 

@@ -10,7 +10,9 @@ You are converting **one wave** at a time inside the `talend_migration` bundle. 
 There is no upfront converter. A wave runs in two phases ([Phases](references/conventions.md#phases)); the checkpoint's `step` and the `Mode:` line in `prompt.md` say which one you are in:
 
 * **Phase 1 - Preparation (interactive), Steps 0-3 and the gate.** Work with the person who started you: read the Talend exports together, ask every open question, and write each answer into the wave folder until the [Definition of ready](references/conventions.md#definition-of-ready) holds. Ask rather than guess.
-* **Phase 2 - Conversion (autonomous), Steps 4-7.** Convert every job in the wave from the wave folder alone. Don't ask and don't wait: low-risk reversible choices go in `## Decisions` as `agent`; anything else becomes `needs_input` on that component, and you continue with the rest.
+* **Phase 2 - Conversion (autonomous), Steps 4-7.** Convert every job in the wave from the wave folder alone. Don't ask and don't wait: low-risk reversible choices go in `## Decisions` as `agent`; anything else becomes `needs_input` on that component, and you continue with the rest. It is capped by the [Retry limit](references/conventions.md#retry-limit).
+
+In both phases: convert deterministically wherever you can - operators and mapping-table rows first, then scripts, and LLM-written code only where neither covers it ([Deterministic first](references/conventions.md#deterministic-first)). And report what each session used ([Cost and performance](references/conventions.md#cost-and-performance)).
 
 Follow the conventions and mapping references below. Use the scripts listed under [Scripts](#scripts) where they fit. When logic from this wave would help other waves, make it a script in this skill's `scripts/` folder on a shared branch ([Reusable scripts](references/conventions.md#reusable-scripts)).
 
@@ -87,7 +89,7 @@ Read each notebook in `notebooks/<wave>/` with `readAssetById`, then edit it wit
 * Use operators from `src/operators` for all I/O and Snowflake calls. Do transformations (tMap, tFilterRow, tAggregateRow ...) inline with the PySpark DataFrame API using the mapping reference.
 * If an operator you need doesn't exist, **do not** write ad-hoc I/O in the notebook and do not edit `src/operators` silently. Mark the component `needs_input` with the proposed function signature in `reason` (a shared change, see conventions), and continue with the rest.
 * Translate tJava/tJavaRow code to PySpark, mark the cell title with `[REVIEW]`, and record it in `components.yml` as `mapping: manual` with that `notebook` and `cell`. It stays `needs_input` until a human reviews it and you add `reviewed_by`.
-* As each component is implemented, update its entry: `implementation`, `notebook`, `cell`, `status: resolved`, and any `semantic_deltas` (behaviour that differs from Talend). Never mark a component `resolved` on the developer's behalf if they haven't confirmed an open question.
+* As each component is implemented, update its entry: `implementation`, `notebook`, `cell`, `status: resolved`, `converted_by` (`operator`, `script:<name>` or `llm`), and any `semantic_deltas` (behaviour that differs from Talend). Write code yourself (`llm`) only when no operator, mapping row or script fits; it is then `mapping: manual` and needs a person's review. If you write the same kind of translation a second time, propose it as a mapping row or a script. Never mark a component `resolved` on the developer's behalf if they haven't confirmed an open question.
 * Do not run the notebook against Snowflake production objects. Do not change the notebook's language.
 
 ## Step 5 - Job YAMLs
