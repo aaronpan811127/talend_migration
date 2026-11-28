@@ -156,6 +156,7 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
    ```
 3. Add any decision you made or were given to `## Decisions`, and anything you learned to `learnings/learnings.md` ([Learnings](#learnings)).
 4. Run `pytest tests/static tests/waves/wave_NN`, push, and open or update the PRs (below).
+5. Report back to whoever started you: your branches and PR URLs and their merge order (or why you couldn't push or open them); the checkpoint you committed (`step`, `next`, your `sessions` entry) and the decisions you added; files changed; the output of the tests and `bundle validate`, and run URLs if you deployed; every `needs_input` / `deferred` component with its reason; any shared change you need.
 
 ### Resuming a previous session
 
@@ -210,6 +211,7 @@ Rules:
 * Deploy only with `--target dev`. Each deploy goes into a **lane** (bundle variable `lane`): its own folder `~/.bundle/talend_migration/dev/<lane>` (so its own state and deployment lock), job-name prefix `[dev <user> <lane>]` and Snowflake schema. People use the default lane `main`. Anything that deploys in parallel under the same identity - Omnigent sub-agents, several terminals, CI jobs - passes `--var lane=wave_NN` (or sets `BUNDLE_VAR_lane`), one lane per wave.
 * Lanes isolate deploys, jobs and Snowflake data; each session's own clone isolates source. A deploy from a sandbox clone uploads that clone's files to the lane's folder; a deploy from a workspace Git folder runs that folder's files in place. Either way, jobs run exactly what's in your working copy, committed or not.
 * Prod deploys happen from `main` through CI or the platform owner, never from a wave branch.
+* A session deploys and runs only if the wave's `prompt.md` allows it, and then always with `--var lane=wave_NN`: `databricks bundle deploy --target dev --var lane=wave_NN`, then `databricks bundle run <job_key> --target dev --var lane=wave_NN`. Never `--target prod`; never unpause a schedule.
 
 ## Naming
 
@@ -293,6 +295,9 @@ Conversion logic that more than one wave can use - parsing a Talend `.item` expo
 * `pytest tests/static` checks code and configs for every wave (no Spark). Run it on Databricks with the `tests/run_tests` notebook (`scope` = `tests/static`) or locally/CI with `pip install -r requirements-dev.txt`.
 * Put wave-specific unit tests in `tests/waves/wave_NN/test_wave_NN_*.py` (see `tests/README.md`).
 * Shared operator changes need unit tests in `tests/unit/operators/`; skill scripts need them in `tests/unit/scripts/` ([Reusable scripts](#reusable-scripts)).
+* `pytest tests/unit` needs Spark (`databricks-connect` or `pyspark`); tests marked `spark` are skipped without it.
+* A failed test blocks review. A `UserWarning` is advisory: fix it or explain it in your report and the PR. Never weaken, skip or edit a static test to make it pass.
+* Don't run notebooks against Snowflake or S3 from a local machine or sandbox. Correctness is checked by the static tests and by dev runs on Databricks.
 
 ## Review checklist
 

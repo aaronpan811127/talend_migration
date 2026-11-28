@@ -95,8 +95,8 @@ def test_skill_links_stay_inside_skills():
 # ---------- conventions.md is the single source; AGENTS.md and the skills link to it ----------
 
 LINK_RX = re.compile(r"conventions\.md#([A-Za-z0-9_-]+)")
-ENTRY_POINTS = [AGENTS, SKILLS / "talend-wave-migration" / "SKILL.md"]
-# Sections every entry point must link, so agents and Genie Code reach the same procedures.
+ENTRY_POINTS = [SKILLS / "talend-wave-migration" / "SKILL.md"]
+# Sections the migration skill must link, so every harness reaches the same procedures.
 CORE_SECTIONS = {"working-copy", "branches", "checkpoint", "decisions", "resuming-and-handing-over", "prs"}
 # Procedure text that belongs only in conventions.md - finding it in an entry point means it was copied back.
 CONVENTIONS_ONLY = [
@@ -162,4 +162,21 @@ def test_slug_matches_github():
 
 
 def test_names_the_snowflake_schema_parameter():
-    assert "snowflake_schema" in COMMON_PARAMS and "snowflake_schema" in AGENTS.read_text()
+    assert "snowflake_schema" in COMMON_PARAMS and "snowflake_schema" in CONVENTIONS.read_text()
+
+
+# AGENTS.md only says how to load the skills and map their tools; migration instructions live in the skills.
+AGENTS_SECTIONS = {"Load the skills", "Tool mapping (Genie Code -> you)"}
+AGENTS_MAX_WORDS = 450
+
+
+def test_agents_md_is_a_thin_entry_point():
+    text = AGENTS.read_text()
+    sections = set(re.findall(r"^## (.+)$", text, flags=re.M))
+    assert sections <= AGENTS_SECTIONS, (
+        f"AGENTS.md has sections {sorted(sections - AGENTS_SECTIONS)} - migration instructions belong in the "
+        "skills (conventions.md); AGENTS.md only loads the skills and maps tools"
+    )
+    words = len(text.split())
+    assert words <= AGENTS_MAX_WORDS, f"AGENTS.md has {words} words (max {AGENTS_MAX_WORDS}) - move instructions to the skills"
+    assert "conventions.md" in text, "AGENTS.md must point to conventions.md"
