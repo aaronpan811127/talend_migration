@@ -34,7 +34,7 @@ Read, in this order:
 
 ## Before you stop
 
-Finished, blocked or out of time: hand over ([Resuming and handing over](.claude/skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)) - commit even half-done work, update the checkpoint with your `sessions` entry (session id from your prompt), push - then open or update the PRs and check CI ([PRs](.claude/skills/talend-pattern-migration/references/conventions.md#prs)).
+Finished, blocked or out of time: hand over ([Resuming and handing over](.claude/skills/talend-pattern-migration/references/conventions.md#resuming-and-handing-over)) - commit even half-done work, update the checkpoint with your `sessions` entry (call `sys_session_get_info` with no arguments for your Omnigent session id and host; on Claude Code also record your Claude session id), push - then open or update the PRs and check CI ([PRs](.claude/skills/talend-pattern-migration/references/conventions.md#prs)).
 
 ## Tool mapping (Genie Code -> you)
 

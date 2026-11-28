@@ -32,7 +32,7 @@ Reusable helpers in `scripts/` (rules: [Reusable scripts](references/conventions
   * `<root>` is the user's own Git folder clone, not the reference checkout. Load the `git` skill and use `runGit` (`status`, `list_branches`, `checkout`, `pull`, `diff`, `commit_and_push`).
   * Ask the user before creating a branch, committing or pushing.
   * Genie Code can't reach GitHub: ask the user to paste PR comments during the resume.
-  * Your `sessions` entry is `id: genie-code`, `by: <user's email>`.
+  * Your `sessions` entry has `harness: genie-code`, `omnigent_session_id: null`, `claude_session_id: null`, `by: <user's email>`.
 * Keep [the checkpoint](references/conventions.md#checkpoint) current after every step below, and record what the user decides in [Decisions](references/conventions.md#decisions).
 
 ## Step 1 - Read the Talend exports

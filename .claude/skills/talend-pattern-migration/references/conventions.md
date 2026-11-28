@@ -55,7 +55,7 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `done` | short sentences: what is finished |
 | `next` | short sentences: what the next session does first (may be empty only when `step` is `done`) |
 | `blocked_on` | optional: `needs_input` components or other blockers |
-| `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over: `id` (the Omnigent session id given in the session's prompt, or `genie-code` / `manual`), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
+| `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over - the ids let a later session be resumed or forked ([Resuming a previous session](#resuming-a-previous-session)): `omnigent_session_id` (from `sys_session_get_info`, `null` outside Omnigent), `claude_session_id` (the Claude Code session id, `null` for other harnesses), `harness` (`claude-code`, `codex`, `cursor`, `genie-code`, `manual`, ...), optional `host` (host or sandbox it ran on), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
 | `notes` | optional free text |
 
 No tooling is needed for the checkpoint: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `depends_on` match the branch you're on and the shared branch merged into it, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
@@ -84,7 +84,10 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
 1. Commit what you have, even half done: `pattern_NN: WIP <what>` - never leave work uncommitted.
 2. Update the checkpoint: `step`, `done`, `next` (concrete: file, cell or check, and what's left), `blocked_on`, `updated`, and append your `sessions` entry:
    ```yaml
-   - id: <Omnigent session id from your prompt, or genie-code / manual>
+   - omnigent_session_id: <sys_session_get_info with no arguments -> your session id, e.g. conv_...; null outside Omnigent>
+     claude_session_id: <your Claude Code session id; null for other harnesses>
+     harness: <claude-code | codex | cursor | genie-code | manual>
+     host: <host or sandbox you ran on, from sys_session_get_info; optional>
      by: <session name or person>
      at: <UTC now, YYYY-MM-DDTHH:MMZ>
      summary: <one line: what this session did and where it stopped>
@@ -92,7 +95,16 @@ A new session gets nothing from earlier sessions except what was pushed. It neve
 3. Add any decision you made or were given to `## Decisions`.
 4. Run `pytest tests/static tests/patterns/pattern_NN`, push, and open or update the PRs (below).
 
-**Forking a previous session (for people starting a session).** A fresh session plus the resume procedure is the default - the repo carries the state. When the last session stopped in the middle of something whose reasoning matters (a half-finished tMap translation, a debugging thread), you can start the next session as a fork of it with the Omnigent CLI, `omnigent run --fork <session id>`, taking the id from the checkpoint's last `sessions` entry. You need access to that session (shared with you, or your own). A fork inherits the old chat but not newer pushes, so the forked session still runs the resume procedure. Agents can't read or fork other sessions themselves.
+### Resuming a previous session
+
+For people starting the next session. A fresh session plus the resume procedure is the default - the repo carries the state. When the last session stopped in the middle of something whose reasoning matters (a half-finished tMap translation, a debugging thread), continue its conversation instead, using the ids in the checkpoint's last `sessions` entry:
+
+| Ids recorded | How to continue | Where it works |
+| --- | --- | --- |
+| `omnigent_session_id` | `omnigent run --fork <omnigent_session_id>` - a new session that starts from the old conversation | anywhere you are signed in to the workspace; you need access to that session (your own, or shared with you) |
+| `claude_session_id` | `claude --resume <claude_session_id>` - Claude Code reopens that conversation | only on the `host` it ran on, because Claude Code keeps its transcripts on that machine; a different sandbox can't resume it |
+
+Either way the old conversation doesn't know about later pushes, so the continued session still runs the resume procedure first, and appends its own `sessions` entry at hand-over. Agents don't resume or fork other sessions themselves.
 
 ### PRs
 

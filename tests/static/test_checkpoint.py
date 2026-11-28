@@ -11,8 +11,11 @@ from project import MAIN, current_branch, inventory_rows, load_yaml, parse_branc
 STEPS = ["setup", "analyze", "spec", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
 FIELDS = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
 REQUIRED = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
-SESSION_FIELDS = {"id", "by", "at", "summary", "url"}
-SESSION_REQUIRED = {"id", "by", "at", "summary"}
+# Session ids are kept so a later session can be resumed (claude --resume) or forked (omnigent run --fork).
+SESSION_IDS = ("omnigent_session_id", "claude_session_id")
+SESSION_REQUIRED = {*SESSION_IDS, "harness", "by", "at", "summary"}
+SESSION_FIELDS = SESSION_REQUIRED | {"host", "url"}
+NO_ID_HARNESSES = {"genie-code", "manual"}  # sessions with nothing to resume
 TIME_FMT = "%Y-%m-%dT%H:%MZ"
 PR_RX = re.compile(r"^(#?\d+|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+)$")
 
@@ -79,7 +82,7 @@ class TestCheckpoint:
         assert at <= now + datetime.timedelta(minutes=10), "updated.at is in the future"
 
     def test_sessions(self, folder):
-        """Hand-over log: complete entries, oldest first, none later than `updated`."""
+        """Hand-over log: complete entries with resumable session ids, oldest first, none later than `updated`."""
         cp = _load(folder)
         sessions = cp.get("sessions")
         assert isinstance(sessions, list) and sessions, "sessions must list at least the session that created the checkpoint"
@@ -89,10 +92,23 @@ class TestCheckpoint:
                 problems.append(f"entry {i} must be a mapping")
                 continue
             missing, unknown = SESSION_REQUIRED - set(s), set(s) - SESSION_FIELDS
-            if missing or unknown:
+            if "id" in s:
+                problems.append(f"entry {i}: `id` was replaced by omnigent_session_id, claude_session_id and harness")
+            elif missing or unknown:
                 problems.append(f"entry {i}: missing {sorted(missing)} unknown {sorted(unknown)}")
-            if any(not str(s.get(k) or "").strip() for k in SESSION_REQUIRED):
-                problems.append(f"entry {i}: id, by, at and summary must be non-empty")
+            if any(not str(s.get(k) or "").strip() for k in ("harness", "by", "at", "summary")):
+                problems.append(f"entry {i}: harness, by, at and summary must be non-empty")
+            ids = {k: s.get(k) for k in SESSION_IDS}
+            for k, v in ids.items():
+                if v is not None and not re.fullmatch(r"\S+", str(v)):
+                    problems.append(f"entry {i}: {k} must be null or a single id without spaces, got {v!r}")
+            harness = str(s.get("harness") or "")
+            if harness == "claude-code" and not ids["claude_session_id"]:
+                problems.append(f"entry {i}: a claude-code session must record claude_session_id (needed for claude --resume)")
+            if harness and harness not in NO_ID_HARNESSES and not any(ids.values()):
+                problems.append(f"entry {i}: {harness} session records no session id, so it can't be resumed or forked")
+            if ids["claude_session_id"] and not s.get("host"):
+                warn(f"{folder.name} sessions entry {i}: claude_session_id without host - claude --resume only works there")
             if s.get("url") and not str(s["url"]).startswith("https://"):
                 problems.append(f"entry {i}: url must be an https link to the session")
             try:

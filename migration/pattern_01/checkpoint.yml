@@ -19,10 +19,13 @@ next:
 blocked_on:
   - tSnowflakeOutputBulkExec_1
   - tSnowflakeRow_1
-# One entry per session, oldest first, appended at hand-over. id = Omnigent session id (fork it with
-# `omnigent run --fork <id>`), or genie-code / manual. Conventions: Resuming and handing over.
+# One entry per session, oldest first, appended at hand-over. The ids resume or fork a session:
+# `omnigent run --fork <omnigent_session_id>`, or `claude --resume <claude_session_id>` on the same host.
+# Conventions: Resuming and handing over, Resuming a previous session.
 sessions:
-  - id: genie-code
+  - omnigent_session_id: null
+    claude_session_id: null
+    harness: genie-code
     by: aaron.pan@databricks.com
     at: 2026-11-27T11:15Z
     summary: Built the pattern_01 reference (notebooks, job, spec, components, validation); first checkpoint and decisions
