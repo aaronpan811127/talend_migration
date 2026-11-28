@@ -9,6 +9,14 @@ Validates one pattern (`pattern_NN`) converted with the `talend-pattern-migratio
 
 `<root>` = the folder three levels above this skill (`<root>/.claude/skills/talend-migration-validation`).
 
+## Scripts
+
+Reusable validation helpers in `scripts/`, added or changed only on a shared branch (rules: Reusable scripts in conventions.md, read from the `talend-pattern-migration` skill). Run from the repo root with `python .claude/skills/talend-migration-validation/scripts/<name>.py --help`.
+
+| Script | What it does | When to use it |
+| --- | --- | --- |
+| _(none yet)_ | | |
+
 ## Step 1 - Review checks (no compute)
 
 * Run `pytest` for `tests/static` and `tests/patterns/<pattern>` with the `<root>/tests/run_tests` notebook (`scope` widget), or with `executeCode` language `python`: `sys.dont_write_bytecode = True` (`/Workspace` rejects `__pycache__` writes), `os.chdir("<root>")`, then `pytest.main([...])`.

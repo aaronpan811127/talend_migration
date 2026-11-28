@@ -58,7 +58,7 @@ Each session works in a clone that only it uses - in an Omnigent sandbox, e.g. `
 | `sessions` | one entry per session that worked on the pattern, oldest first, appended at hand-over: `id` (the Omnigent session id given in the session's prompt, or `genie-code` / `manual`), `by` (person or session name), `at` (UTC hand-over time), `summary` (one line), optional `url` (link to the session in `<workspace-url>/omnigent`) |
 | `notes` | optional free text |
 
-No scripts are needed: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `depends_on` match the branch you're on and the shared branch merged into it, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
+No tooling is needed for the checkpoint: edit the YAML and commit it with the work (`pattern_NN: checkpoint - <step>`). `tests/static/test_checkpoint.py` checks the fields, that `branch` and `depends_on` match the branch you're on and the shared branch merged into it, that `step` agrees with `jobs.csv`, that PRs are recorded from `pr_review` on, that `sessions` entries are complete and in time order, and warns when a `needs_input` component is missing from `blocked_on`.
 
 ### Decisions
 
@@ -194,11 +194,30 @@ One file per pattern, owned by the pattern owner, with columns `talend_job,job_k
 
 Rules (`tests/static/test_components.py`): `unsupported` can't be `resolved`; `standard` types must appear in component-mapping.md (otherwise use `manual` or add the row as a shared change); every `[REVIEW]` cell is a `manual` component; no `needs_input` once a job is `ready_for_review` or `done`. `needs_input` and `deferred` items show as warnings on every test run.
 
+## Reusable scripts
+
+Conversion logic that more than one pattern can use - parsing a Talend `.item` export, generating job YAMLs or `jobs.csv` rows, translating common tMap expressions, comparing outputs - lives as a script in the `scripts/` folder of the skill that uses it. There is still no upfront generic converter: scripts grow out of real pattern work.
+
+| Skill | Scripts folder | For |
+| --- | --- | --- |
+| `talend-pattern-migration` | `.claude/skills/talend-pattern-migration/scripts/` | analysing exports, generating and converting pattern files |
+| `talend-migration-validation` | `.claude/skills/talend-migration-validation/scripts/` | validation and reconciliation helpers |
+
+* **Shared files.** Scripts are added or changed only on a `shared/<topic>/...` branch with its own PR ([PRs](#prs)), never on a migration branch. A migration branch that needs a new or changed script merges that shared branch in and sets `depends_on` in its checkpoint.
+* **When to write one.** When a second pattern needs the same logic (or obviously will). Logic only one pattern needs stays in `notebooks/pattern_NN/*.py` with tests in `tests/patterns/pattern_NN/`.
+* **Helpers, not autopilot.** Script output is reviewed like hand-written work; anything a script can't map is still recorded as `needs_input` in `components.yml`.
+* **Interface.** Python 3.12 standard library plus `requirements-dev.txt` (or a POSIX shell script). A command-line tool with `argparse` and `--help`; reads only the paths it is given; writes only to an output path it is given (default: stdout) and supports `--dry-run` when it writes files; no credentials, no prod targets, no Spark or Databricks calls unless its docstring says so.
+* **Docstring.** The module docstring says what it does, its inputs and outputs, and a `Usage:` example.
+* **Discoverable.** Listed in the `## Scripts` section of its skill's `SKILL.md` (file name, one line, when to use it). Run from the repo root: `python .claude/skills/<skill>/scripts/<name>.py --help`; with a skill loader, the script is inside that skill's own folder.
+* **Tested.** A unit test in `tests/unit/scripts/test_<script name>.py` (Python scripts).
+
+`tests/static/test_scripts.py` enforces the location (no `.py`/`.sh` files elsewhere in the repo except `src/`, `tests/`, `notebooks/` and skill `scripts/` folders), the docstring, a working `--help`, the `SKILL.md` listing and the unit test; `test_git_ownership.py` keeps scripts off migration branches.
+
 ## Tests
 
 * `pytest tests/static` checks code and configs for every pattern (no Spark). Run it on Databricks with the `tests/run_tests` notebook (`scope` = `tests/static`) or locally/CI with `pip install -r requirements-dev.txt`.
 * Put pattern-specific unit tests in `tests/patterns/pattern_NN/test_pattern_NN_*.py` (see `tests/README.md`).
-* Shared operator changes need unit tests in `tests/unit/operators/`.
+* Shared operator changes need unit tests in `tests/unit/operators/`; skill scripts need them in `tests/unit/scripts/` ([Reusable scripts](#reusable-scripts)).
 
 ## Review checklist
 

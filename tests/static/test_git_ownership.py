@@ -113,6 +113,7 @@ def test_branch_name_format(name, ok):
     ("notebooks/pattern_02/01_x.ipynb", "pattern_01", False),
     ("resources/jobs/pattern_010_x.job.yml", "pattern_01", False),
     ("src/operators/readers.py", "pattern_01", False),
+    (".claude/skills/talend-pattern-migration/scripts/parse_item.py", "pattern_01", False),  # scripts are shared
     ("databricks.yml", "pattern_01", False),
     ("AGENTS.md", "pattern_01", False),
 ])

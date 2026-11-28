@@ -38,13 +38,15 @@ talend_migration/
 │       └── validation_results.md  # recorded results
 └── .claude/skills/                # agent skills (Genie Code, and discovered by Claude Code / Omnigent Claude sessions)
     ├── talend-pattern-migration/  # read exports -> set up files -> spec -> convert -> job YAMLs -> review checklist
-    │   └── references/            # conventions, component mapping, notebook template
+    │   ├── references/            # conventions, component mapping, notebook template
+    │   └── scripts/               # reusable conversion scripts (shared; changed on shared branches)
     └── talend-migration-validation/  # review checklist -> dev run -> reconcile -> record
+        └── scripts/               # reusable validation scripts
 ```
 
 ## Working in parallel
 
-There is no automatic Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `.claude/skills/talend-pattern-migration/references/`. Reusable findings (new operators, new mappings) go back as shared changes.
+There is no upfront Talend-to-Databricks converter. Each developer works out the conversion for their own pattern with Genie Code, using the conventions, component mapping and notebook template in `.claude/skills/talend-pattern-migration/references/`. Reusable findings go back as shared changes: new operators in `src/operators/`, new mappings in the references, and reusable conversion scripts in the skills' `scripts/` folders (see Reusable scripts in the conventions).
 
 1. Each session (an Omnigent sandbox session, or you in Genie Code) works in its own clone of `https://github.com/aaronpan811127/talend_migration` - in Omnigent inside the sandbox, in Genie Code your own Git folder; no worktrees, never a shared clone. A pattern's work lives on one branch, `migrate/pattern_NN/<YYYYMMDD-HHMM>` (UTC creation time), plus `shared/<topic>/<YYYYMMDD-HHMM>` if shared files must change. Sessions take turns on that branch and hand over through `migration/pattern_NN/checkpoint.yml`; a new branch is started only when the pattern has no open one.
 2. In Genie Code, open Customizations > Skills > New > Add from workspace folder and pick `<your clone>/.claude/skills`. Both skills then load automatically. Claude harnesses (Claude Code, and Omnigent sessions on a Claude harness started in the repo clone) discover `.claude/skills` on their own and load the skills on demand; any other agent (Codex, Cursor, ...) reads `AGENTS.md`, which points to the same files.

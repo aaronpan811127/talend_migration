@@ -28,6 +28,7 @@ Read, in this order:
 ## While you work
 
 * Change only your pattern's files ([Ownership](.claude/skills/talend-pattern-migration/references/conventions.md#ownership-avoids-merge-conflicts)). A shared change goes on its own shared branch and PR, only if the pattern can't be delivered without it, with unit tests ([PRs](.claude/skills/talend-pattern-migration/references/conventions.md#prs)).
+* Use the scripts listed in each skill's `## Scripts` section; they live in `.claude/skills/<skill>/scripts/`. Logic other patterns could reuse becomes a script there, on a shared branch only ([Reusable scripts](.claude/skills/talend-pattern-migration/references/conventions.md#reusable-scripts)).
 * After each step, update `migration/pattern_NN/checkpoint.yml` ([Checkpoint](.claude/skills/talend-pattern-migration/references/conventions.md#checkpoint)) and record decisions in `spec.md` ([Decisions](.claude/skills/talend-pattern-migration/references/conventions.md#decisions)).
 * Before every push: `pytest tests/static tests/patterns/pattern_NN`.
 

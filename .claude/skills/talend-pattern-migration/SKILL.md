@@ -7,7 +7,7 @@ description: Convert one Talend job family (pattern_01..pattern_13) into the tal
 
 You are converting **one job family (pattern)** at a time inside the `talend_migration` bundle. Several people do this in parallel, each owning different patterns, so you must stay inside the files that pattern owns.
 
-There is no parser or converter script. Each developer works out the conversion for their own pattern; help them by reading the Talend exports together and following the conventions and mapping references below. Do not write a generic Talend-to-Databricks converter; if a reusable helper emerges from your pattern, propose it as a shared change.
+There is no upfront converter. Each developer works out the conversion for their own pattern; help them by reading the Talend exports together and following the conventions and mapping references below. Use the scripts listed under [Scripts](#scripts) where they fit. When logic from this pattern would help other patterns, make it a script in this skill's `scripts/` folder on a shared branch ([Reusable scripts](references/conventions.md#reusable-scripts)).
 
 Read before starting:
 * [references/conventions.md](references/conventions.md) - **the single source of the rules**: ownership, Git, checkpoint, decisions, resume and hand-over, Snowflake, review checklist, definition of done. **Always read.** This skill only adds the migration steps and what is specific to Genie Code; it links to conventions instead of repeating it.
@@ -15,6 +15,14 @@ Read before starting:
 * [references/notebook-template.md](references/notebook-template.md) - required cell structure of a pattern notebook.
 
 When conversion is finished, hand off to the `talend-migration-validation` skill.
+
+## Scripts
+
+Reusable helpers in `scripts/` (rules: [Reusable scripts](references/conventions.md#reusable-scripts)). Run from the repo root with `python .claude/skills/talend-pattern-migration/scripts/<name>.py --help`; check their output like your own work.
+
+| Script | What it does | When to use it |
+| --- | --- | --- |
+| _(none yet)_ | | |
 
 ## Step 0 - Locate the project and the pattern
 

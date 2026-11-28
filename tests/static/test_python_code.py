@@ -4,13 +4,14 @@ import ast
 import pytest
 
 from project import (
-    NOTEBOOKS, ROOT, SECRET_RX, SRC, notebooks_in, operators_exports, pattern_ids, pattern_modules,
+    NOTEBOOKS, ROOT, SECRET_RX, SKILLS, SRC, notebooks_in, operators_exports, pattern_ids, pattern_modules,
     python_code, read_notebook, rel,
 )
 
 PY_FILES = sorted(
     {p for d in (SRC, ROOT / "tests") for p in d.rglob("*.py")}
     | {m for pid in pattern_ids() for m in pattern_modules(pid)}
+    | set(SKILLS.glob("*/scripts/**/*.py"))  # reusable skill scripts
 )
 ALL_NOTEBOOKS = notebooks_in(NOTEBOOKS)
 

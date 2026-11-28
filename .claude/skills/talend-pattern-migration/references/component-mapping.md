@@ -1,6 +1,6 @@
 # Talend to Databricks mapping
 
-Starting guidance for converting by hand - there is no converter script. `MANUAL` means no standard mapping: the pattern owner decides and records it in the spec. When you work out a mapping for your pattern that others can reuse, add it here as a shared change.
+Starting guidance for converting by hand; reusable scripts in the skill's `scripts/` folder may automate parts of it ([Reusable scripts](conventions.md#reusable-scripts)). `MANUAL` means no standard mapping: the pattern owner decides and records it in the spec. When you work out a mapping for your pattern that others can reuse, add it here as a shared change.
 
 ## Components
 
