@@ -13,6 +13,7 @@ Everything about one wave except its notebooks, job YAMLs and tests lives in `mi
 | Path | Holds | Changes |
 | --- | --- | --- |
 | `spec.md` | the design: why these jobs are one wave, Talend jobs in scope, flow, parameters, Snowflake objects, variances between jobs, `## Decisions`, open questions | when the design or a decision changes |
+| `prompt.md` | the prompt that starts a session on this wave: one ```` ```text ```` block under `## Prompt` to paste into Omnigent, with the wave's own instructions (whether it may deploy, reviewers, notes about its jobs). No progress - that is in `progress/` | when the wave's instructions change |
 | `inputs/` | what the work starts from: Talend `.item` exports (plus `.properties`), context files, sample data | when exports are added or refreshed |
 | `progress/jobs.csv` | the wave's jobs: `talend_job,job_key,owner,status,notes` ([Inventory](#inventory-migrationwave_nnprogressjobscsv)) | as jobs move through the statuses |
 | `progress/checkpoint.yml` | hand-over state between sessions ([Checkpoint](#checkpoint)) | after every step and before every stop |

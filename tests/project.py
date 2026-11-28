@@ -21,6 +21,7 @@ CONVENTIONS = SKILLS / "talend-wave-migration" / "references" / "conventions.md"
 MIGRATION = ROOT / "migration"  # one migration/wave_NN/ folder per wave
 # Wave folder layout (conventions.md, Wave folder); paths relative to migration/wave_NN/.
 SPEC = "spec.md"                              # design: scope, grouping, flow, parameters, Snowflake objects, decisions
+PROMPT = "prompt.md"                          # the prompt that starts a session on this wave
 JOBS_CSV = "progress/jobs.csv"                # which Talend jobs are in the wave, owner and status
 CHECKPOINT = "progress/checkpoint.yml"        # hand-over state between sessions
 COMPONENTS = "progress/components.yml"        # status of every Talend component

@@ -55,7 +55,7 @@ Skip if `<root>/notebooks/<wave>/` already exists. Never overwrite existing file
 * `notebooks/<wave>/` - one notebook per job task (`01_<step>`, `02_<step>` ...), based on the notebooks in `notebooks/wave_01/` and retitled. Decide the split from the Talend subjobs (see notebook-template.md).
 * `tests/waves/<wave>/test_<wave>_*.py` - start from `tests/waves/wave_01/test_wave_01.py`.
 * `resources/jobs/<wave>_<talend_job_snake>.job.yml` - one per Talend job, based on `resources/jobs/wave_01_example.job.yml`, with the job key, name and tags from conventions.
-* `migration/<wave>/spec.md` (with an empty `## Decisions` table), `components.yml`, `validation.yml` and `checkpoint.yml` - based on wave_01's, with placeholders reset.
+* `migration/<wave>/` - the wave folder ([Wave folder](references/conventions.md#wave-folder)), based on wave_01's with placeholders reset: `spec.md` (empty `## Decisions` table), `prompt.md` (wave id, lane and notes changed - ask the user whether the wave may deploy), `inputs/`, `progress/components.yml` and `progress/checkpoint.yml`, `validation/validation.yml`, `scripts/README.md`, `learnings/learnings.md`.
 * `migration/<wave>/progress/jobs.csv` (header `talend_job,job_key,owner,status,notes`) with a row per Talend job (`status` = `analyzing`).
 
 Show the developer the list of files before creating them.

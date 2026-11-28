@@ -30,6 +30,7 @@ talend_migration/
 ├── migration/
 │   └── wave_NN/                   # one folder per wave (see conventions, Wave folder)
 │       ├── spec.md                # design: why these jobs are one wave, flow, parameters, Snowflake objects, Decisions, open questions
+│       ├── prompt.md              # the prompt to paste when starting a session on this wave
 │       ├── inputs/                # Talend .item exports, context files, sample data
 │       ├── progress/
 │       │   ├── jobs.csv           # the wave's jobs: Talend job -> job key -> owner -> status
@@ -66,9 +67,8 @@ There is no upfront Talend-to-Databricks converter. Each developer works out the
 
 A session only knows what earlier sessions pushed. It never sees their chat or sandbox. So:
 
-* **New or continuing wave (default): start a fresh session** in `<workspace-url>/omnigent` (host: Sandbox) with a prompt like:
-  > Work on wave_02 of https://github.com/aaronpan811127/talend_migration. Follow AGENTS.md: clone the repo, continue the wave's open `migrate/wave_02/...` branch if there is one (run the resume procedure first) or create one, use `--var lane=wave_02`. When you hand over, record your Omnigent session id (`sys_session_get_info`) and Claude Code session id in the checkpoint's `sessions` entry. Don't deploy.
-* **Continuing a half-finished step whose reasoning matters:** use the ids in the last entry of `migration/wave_02/progress/checkpoint.yml` `sessions` - `omnigent run --fork <omnigent_session_id>` from anywhere you can access that session, or `claude --resume <claude_session_id>` on the same `host` - then send the same prompt. The continued session still runs the resume procedure, because the branch may have moved on. Details: Resuming a previous session in the conventions.
+* **New or continuing wave (default): start a fresh session** in `<workspace-url>/omnigent` (host: Sandbox) and paste the `## Prompt` block of `migration/wave_NN/prompt.md` - each wave keeps its own prompt there, including whether it may deploy and anything a session must know up front. For a new wave, copy `migration/wave_01/prompt.md` and change the wave id and notes.
+* **Continuing a half-finished step whose reasoning matters:** use the ids in the last entry of `migration/wave_NN/progress/checkpoint.yml` `sessions` - `omnigent run --fork <omnigent_session_id>` from anywhere you can access that session, or `claude --resume <claude_session_id>` on the same `host` - then send the wave's prompt. The continued session still runs the resume procedure, because the branch may have moved on. Details: Resuming a previous session in the conventions.
 * Only one session per wave at a time. Check the checkpoint's `updated` time before starting one.
 
 Details: `.claude/skills/talend-wave-migration/references/conventions.md`, sections Checkpoint, Decisions, and Resuming and handing over.

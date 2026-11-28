@@ -6,7 +6,7 @@ import re
 import pytest
 
 from project import (
-    JOBS_CSV, JOBS_CSV_FIELDS, LEARNINGS, MIGRATION, PROGRESS_FILES, SPEC, VALIDATION_YML, WAVE_RX, WAVE_SUBDIRS,
+    JOBS_CSV, JOBS_CSV_FIELDS, LEARNINGS, MIGRATION, PROGRESS_FILES, PROMPT, SECRET_RX, SPEC, VALIDATION_YML, WAVE_RX, WAVE_SUBDIRS,
     all_job_keys, inventory_rows, job_files, job_wave, load_yaml, wave_dirs, warn,
 )
 
@@ -88,15 +88,42 @@ def test_migration_folder_only_holds_waves():
 @pytest.mark.parametrize("folder", WAVE_DIRS, ids=lambda p: p.name)
 class TestWaveFolder:
     def test_layout(self, folder):
-        """spec.md plus inputs/, progress/, validation/, scripts/, learnings/ - and nothing else at the wave root."""
-        missing = [d for d in WAVE_SUBDIRS if not (folder / d).is_dir()] + ([SPEC] if not (folder / SPEC).is_file() else [])
+        """spec.md, prompt.md plus inputs/, progress/, validation/, scripts/, learnings/ - nothing else at the wave root."""
+        missing = [d for d in WAVE_SUBDIRS if not (folder / d).is_dir()] + [f for f in (SPEC, PROMPT) if not (folder / f).is_file()]
         assert not missing, f"{folder.name} is missing {missing} (conventions, Wave folder)"
-        extra = sorted(p.name for p in folder.iterdir() if p.name not in {SPEC, *WAVE_SUBDIRS})
+        extra = sorted(p.name for p in folder.iterdir() if p.name not in {SPEC, PROMPT, *WAVE_SUBDIRS})
         assert not extra, f"{folder.name}: move {extra} into one of {list(WAVE_SUBDIRS)}"
         stray = sorted(p.name for p in (folder / "progress").iterdir() if p.name not in PROGRESS_FILES)
         assert not stray, f"progress/ holds only {sorted(PROGRESS_FILES)}, found {stray}"
         stray = sorted(p.name for p in (folder / "validation").iterdir() if p.name not in VALIDATION_ENTRIES)
         assert not stray, f"validation/ holds only {sorted(VALIDATION_ENTRIES)}, found {stray}"
+
+    def test_prompt(self, folder):
+        """prompt.md: one ```text block under '## Prompt' that names this wave and its lane, points to AGENTS.md,
+        asks for the session ids, and says whether the session may deploy."""
+        path = folder / PROMPT
+        assert path.is_file(), f"{folder.name}/{PROMPT} missing (conventions, Wave folder)"
+        text = path.read_text()
+        section = re.search(r"^## Prompt\s*$(.*?)(?=^## |\Z)", text, flags=re.M | re.S)
+        assert section, "prompt.md needs a '## Prompt' section"
+        blocks = re.findall(r"^```text\n(.*?)^```", section.group(1), flags=re.M | re.S)
+        assert len(blocks) == 1, f"'## Prompt' must hold exactly one ```text block (the text to paste), found {len(blocks)}"
+        prompt, wave = blocks[0], folder.name
+        needed = {
+            wave: "the wave id",
+            f"--var lane={wave}": "its dev lane",
+            "AGENTS.md": "the agent instructions",
+            "github.com/aaronpan811127/talend_migration": "the repo URL",
+            "sys_session_get_info": "recording the session ids at hand-over",
+        }
+        missing = [f"{k} ({why})" for k, why in needed.items() if k not in prompt]
+        assert not missing, f"prompt must mention {missing}"
+        others = sorted(set(re.findall(r"\bwave_\d{2}\b", prompt)) - {wave})
+        assert not others, f"prompt mentions other waves {others} - copied from another wave?"
+        assert re.search(r"(?i)\bdon'?t deploy\b|\bmay deploy\b", prompt), \
+            "prompt must say whether the session may deploy ('Don't deploy.' or 'You may deploy ... --var lane=...')"
+        assert "--target prod" not in prompt, "never ask a session to use --target prod"
+        assert not SECRET_RX.search(text), "no credentials in prompt.md"
 
     def test_learnings_log(self, folder):
         """learnings/learnings.md: entries '## YYYY-MM-DD <title>', oldest first, each with a 'Promoted:' line."""
