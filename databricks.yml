@@ -1,5 +1,5 @@
 # Talend -> Databricks migration bundle
-# Deploy with: databricks bundle deploy --target dev [--var lane=pattern_NN for parallel agents]
+# Deploy with: databricks bundle deploy --target dev [--var lane=wave_NN for parallel agents]
 
 bundle:
   name: talend_migration
@@ -21,7 +21,7 @@ variables:
     description: Secret scope holding Snowflake credentials (keys - account, user, password, role, warehouse, database)
     default: snowflake-dev
   lane:
-    description: Dev isolation lane. 'main' for people; parallel agents pass --var lane=pattern_NN (or BUNDLE_VAR_lane) so each gets its own deploy folder, job names and Snowflake schema.
+    description: Dev isolation lane. 'main' for people; parallel agents pass --var lane=wave_NN (or BUNDLE_VAR_lane) so each gets its own deploy folder, job names and Snowflake schema.
     default: main
   snowflake_schema:
     description: Snowflake schema that unqualified tables are written to. Dev = one shadow schema per developer and lane, so parallel runs don't overwrite each other.

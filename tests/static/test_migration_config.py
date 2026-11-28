@@ -1,13 +1,17 @@
-"""Static checks on migration/<pattern>/{jobs.csv,spec.md,validation.yml}."""
+"""Static checks on migration/<wave>/: folder layout, spec.md, progress/jobs.csv, validation/validation.yml,
+learnings/learnings.md (conventions.md, Wave folder)."""
 import csv
 import re
 
 import pytest
 
 from project import (
-    JOBS_CSV, JOBS_CSV_FIELDS, MIGRATION, PATTERN_RX, all_job_keys, inventory_rows, job_files, job_pattern,
-    load_yaml, pattern_dirs, warn,
+    JOBS_CSV, JOBS_CSV_FIELDS, LEARNINGS, MIGRATION, PROGRESS_FILES, SPEC, VALIDATION_YML, WAVE_RX, WAVE_SUBDIRS,
+    all_job_keys, inventory_rows, job_files, job_wave, load_yaml, wave_dirs, warn,
 )
+
+VALIDATION_ENTRIES = {"validation.yml", "results.md", "reports"}
+LEARNING_RX = re.compile(r"^## (\d{4}-\d{2}-\d{2}) \S", flags=re.M)
 
 STATUSES = {"not_started", "analyzing", "converting", "validating", "ready_for_review", "done", "blocked"}
 NEEDS_JOB_FILE = {"converting", "validating", "ready_for_review", "done"}
@@ -15,15 +19,15 @@ DATASET_REQUIRED = {"snowflake": ({"table", "query"}, True), "table": ({"table"}
 
 
 def test_no_central_inventory():
-    """The inventory is split per pattern (migration/pattern_NN/jobs.csv) so owners don't conflict."""
+    """The inventory is split per wave (migration/wave_NN/progress/jobs.csv) so owners don't conflict."""
     assert not (MIGRATION / "inventory.csv").exists(), \
-        "migration/inventory.csv is replaced by migration/pattern_NN/jobs.csv - move its rows there"
+        "migration/inventory.csv is replaced by migration/wave_NN/progress/jobs.csv - move its rows there"
 
 
-@pytest.mark.parametrize("folder", pattern_dirs(), ids=lambda p: p.name)
+@pytest.mark.parametrize("folder", wave_dirs(), ids=lambda p: p.name)
 def test_jobs_csv_header(folder):
     path = folder / JOBS_CSV
-    assert path.is_file(), f"{folder.name}/jobs.csv missing (header: {','.join(JOBS_CSV_FIELDS)})"
+    assert path.is_file(), f"{folder.name}/{JOBS_CSV} missing (header: {','.join(JOBS_CSV_FIELDS)})"
     with open(path, newline="") as fh:
         assert next(csv.reader(fh), None) == JOBS_CSV_FIELDS
 
@@ -36,8 +40,8 @@ def test_inventory_rows():
             problems.append(f"{where}: status '{r['status']}' not in {sorted(STATUSES)}")
         if not r["talend_job"]:
             problems.append(f"{where}: talend_job is required")
-        if r["job_key"] and not r["job_key"].startswith(f"{r['pattern']}_"):
-            problems.append(f"{where}: job_key '{r['job_key']}' must start with '{r['pattern']}_' (the folder)")
+        if r["job_key"] and not r["job_key"].startswith(f"{r['wave']}_"):
+            problems.append(f"{where}: job_key '{r['job_key']}' must start with '{r['wave']}_' (the folder)")
         if "@" not in (r["owner"] or "") and r["status"] != "not_started":
             problems.append(f"{where}: owner email required once work has started")
         if r["status"] == "blocked" and not r["notes"]:
@@ -46,7 +50,7 @@ def test_inventory_rows():
 
 
 def test_inventory_keys_unique():
-    """Unique across all patterns, so a Talend job can't be claimed by two families."""
+    """Unique across all waves, so a Talend job can't be claimed by two waves."""
     rows = inventory_rows()
     for field in ("job_key", "talend_job"):
         seen = {}
@@ -64,25 +68,54 @@ def test_inventory_matches_job_files():
     missing_files = sorted(r["source"] for r in rows if r["status"] in NEEDS_JOB_FILE and r["job_key"] not in defined)
     assert not missing_files, f"jobs.csv rows without a job file: {missing_files}"
     unlisted = sorted(defined - listed)
-    assert not unlisted, f"job files not listed in any migration/pattern_NN/jobs.csv: {unlisted}"
+    assert not unlisted, f"job files not listed in any migration/wave_NN/progress/jobs.csv: {unlisted}"
     wrong_folder = sorted(
-        f"{f.name} -> listed in {r['pattern']}" for f in job_files() for r in rows
-        if r["job_key"] in {k for k in load_yaml(f).get("resources", {}).get("jobs", {})} and job_pattern(f) != r["pattern"]
+        f"{f.name} -> listed in {r['wave']}" for f in job_files() for r in rows
+        if r["job_key"] in {k for k in load_yaml(f).get("resources", {}).get("jobs", {})} and job_wave(f) != r["wave"]
     )
-    assert not wrong_folder, f"job listed in another pattern's jobs.csv: {wrong_folder}"
+    assert not wrong_folder, f"job listed in another wave's jobs.csv: {wrong_folder}"
 
 
-PATTERN_DIRS = pattern_dirs()
+WAVE_DIRS = wave_dirs()
 
 
-def test_migration_folder_only_holds_patterns():
-    """migration/ holds inventory.csv and pattern_NN/ folders only (catches typos and the old patterns/ layer)."""
-    stray = sorted(p.name for p in MIGRATION.iterdir() if p.is_dir() and not PATTERN_RX.match(p.name))
-    assert not stray, f"unexpected folders in migration/: {stray} (pattern folders are migration/pattern_NN/)"
+def test_migration_folder_only_holds_waves():
+    """migration/ holds inventory.csv and wave_NN/ folders only (catches typos and the old waves/ layer)."""
+    stray = sorted(p.name for p in MIGRATION.iterdir() if p.is_dir() and not WAVE_RX.match(p.name))
+    assert not stray, f"unexpected folders in migration/: {stray} (wave folders are migration/wave_NN/)"
 
 
-@pytest.mark.parametrize("folder", PATTERN_DIRS, ids=lambda p: p.name)
-class TestPatternFolder:
+@pytest.mark.parametrize("folder", WAVE_DIRS, ids=lambda p: p.name)
+class TestWaveFolder:
+    def test_layout(self, folder):
+        """spec.md plus inputs/, progress/, validation/, scripts/, learnings/ - and nothing else at the wave root."""
+        missing = [d for d in WAVE_SUBDIRS if not (folder / d).is_dir()] + ([SPEC] if not (folder / SPEC).is_file() else [])
+        assert not missing, f"{folder.name} is missing {missing} (conventions, Wave folder)"
+        extra = sorted(p.name for p in folder.iterdir() if p.name not in {SPEC, *WAVE_SUBDIRS})
+        assert not extra, f"{folder.name}: move {extra} into one of {list(WAVE_SUBDIRS)}"
+        stray = sorted(p.name for p in (folder / "progress").iterdir() if p.name not in PROGRESS_FILES)
+        assert not stray, f"progress/ holds only {sorted(PROGRESS_FILES)}, found {stray}"
+        stray = sorted(p.name for p in (folder / "validation").iterdir() if p.name not in VALIDATION_ENTRIES)
+        assert not stray, f"validation/ holds only {sorted(VALIDATION_ENTRIES)}, found {stray}"
+
+    def test_learnings_log(self, folder):
+        """learnings/learnings.md: entries '## YYYY-MM-DD <title>', oldest first, each with a 'Promoted:' line."""
+        path = folder / LEARNINGS
+        assert path.is_file(), f"{folder.name}/{LEARNINGS} missing"
+        text = re.sub(r"<!--.*?-->", "", path.read_text(), flags=re.S)  # the template example is a comment
+        entries = re.split(r"^(?=## )", text, flags=re.M)[1:]
+        dates, problems = [], []
+        for e in entries:
+            m = LEARNING_RX.match(e)
+            if not m:
+                problems.append(f"entry heading must be '## YYYY-MM-DD <title>': {e.splitlines()[0][:60]}")
+                continue
+            dates.append(m.group(1))
+            if not re.search(r"^Promoted: \S", e, flags=re.M):
+                problems.append(f"{e.splitlines()[0][3:60]}: add 'Promoted: no' or where it was promoted")
+        assert not problems, problems
+        assert dates == sorted(dates), "learnings must be oldest first (append new entries at the end)"
+
     def test_spec_decisions(self, folder):
         """spec.md has a `## Decisions` table: | Date | Decision | Why | Decided by |, valid dates, oldest first."""
         spec = folder / "spec.md"
@@ -109,20 +142,25 @@ class TestPatternFolder:
         assert dates == sorted(dates), "decisions must be oldest first (append new rows at the end)"
 
     def test_spec_exists(self, folder):
-        spec = folder / "spec.md"
+        spec = folder / SPEC
         assert spec.is_file(), "spec.md missing"
-        if "TODO" in spec.read_text():
+        text = spec.read_text()
+        assert re.search(r"^## Why these jobs are one wave\s*$", text, flags=re.M), \
+            "spec.md needs '## Why these jobs are one wave' (the grouping rule: pattern, dependencies, ...)"
+        assert not re.search(r"^Status:", text, flags=re.M), \
+            "spec.md has no Status line - status lives in progress/jobs.csv and progress/checkpoint.yml"
+        if "TODO" in text:
             warn(f"{folder.name}/spec.md still contains TODO")
 
     def test_talend_exports_present(self, folder):
-        if not list((folder / "talend").glob("*.item")):
-            warn(f"{folder.name}: no Talend .item exports in talend/")
+        if not list((folder / "inputs").glob("*.item")):
+            warn(f"{folder.name}: no Talend .item exports in inputs/")
 
     def test_validation_config(self, folder):
-        path = folder / "validation.yml"
-        assert path.is_file(), "validation.yml missing"
+        path = folder / VALIDATION_YML
+        assert path.is_file(), f"{VALIDATION_YML} missing"
         cfg = load_yaml(path)
-        assert cfg.get("pattern") == folder.name, "validation.yml pattern must match the folder"
+        assert cfg.get("wave") == folder.name, "validation.yml wave must match the folder"
         checks = cfg.get("checks") or []
         assert checks, "validation.yml has no checks"
         names = [c.get("name") for c in checks]
@@ -154,12 +192,12 @@ class TestPatternFolder:
         assert not problems, problems
 
     def test_validation_placeholders(self, folder):
-        """Snowflake `actual` datasets use ${snowflake_schema}; only placeholders validate_pattern can fill."""
-        text = (folder / "validation.yml").read_text()
+        """Snowflake `actual` datasets use ${snowflake_schema}; only placeholders validate_wave can fill."""
+        text = (folder / VALIDATION_YML).read_text()
         unknown = sorted(set(re.findall(r"\$\{([A-Za-z0-9_.]+)\}", text)) - {"snowflake_schema"})
         assert not unknown, f"unknown placeholders {unknown} - only ${{snowflake_schema}} is filled at run time"
         problems = []
-        for c in load_yaml(folder / "validation.yml").get("checks") or []:
+        for c in load_yaml(folder / VALIDATION_YML).get("checks") or []:
             actual = c.get("actual") or {}
             if actual.get("type") == "snowflake":
                 ref = str(actual.get("table") or actual.get("query") or "")
@@ -168,6 +206,6 @@ class TestPatternFolder:
         assert not problems, problems
 
     def test_validation_actual_is_not_prod(self, folder):
-        for c in load_yaml(folder / "validation.yml").get("checks") or []:
+        for c in load_yaml(folder / VALIDATION_YML).get("checks") or []:
             table = str((c.get("actual") or {}).get("table", ""))
             assert not re.match(r"(?i)^prod", table), f"{c.get('name')}: actual points at a prod object {table}"

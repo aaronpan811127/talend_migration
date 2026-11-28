@@ -1,12 +1,12 @@
-"""Static checks on migration/<pattern>/components.yml (status of every Talend component).
+"""Static checks on migration/<wave>/progress/components.yml (status of every Talend component).
 
-Rules: .claude/skills/talend-pattern-migration/references/conventions.md#component-status-file
+Rules: .claude/skills/talend-wave-migration/references/conventions.md#component-status-file
 """
 import re
 
 import pytest
 
-from project import ROOT, SKILLS, inventory_rows, load_yaml, pattern_dirs, pattern_notebooks, read_notebook, warn
+from project import COMPONENTS, ROOT, SKILLS, inventory_rows, load_yaml, wave_dirs, wave_notebooks, read_notebook, warn
 
 MAPPINGS = {"standard", "manual", "not_needed", "unsupported"}
 STATUSES = {"resolved", "needs_input", "deferred"}
@@ -15,11 +15,11 @@ FIELDS = {"name", "type", "mapping", "implementation", "notebook", "cell", "stat
 # Inventory statuses from which components.yml is required, and from which nothing may need input.
 REQUIRED_FROM = {"converting", "validating", "ready_for_review", "done"}
 NO_OPEN_INPUT_FROM = {"ready_for_review", "done"}
-MAPPING_DOC = SKILLS / "talend-pattern-migration" / "references" / "component-mapping.md"
+MAPPING_DOC = SKILLS / "talend-wave-migration" / "references" / "component-mapping.md"
 
 
-def _inventory_statuses(pattern):
-    return {r["status"] for r in inventory_rows() if r["pattern"] == pattern}
+def _inventory_statuses(wave):
+    return {r["status"] for r in inventory_rows() if r["wave"] == wave}
 
 
 def _documented_types():
@@ -34,13 +34,13 @@ def _is_documented(ctype, documented):
     return ctype in documented or any(d.endswith("*") and ctype.startswith(d[:-1]) for d in documented)
 
 
-PATTERN_DIRS = pattern_dirs()
+WAVE_DIRS = wave_dirs()
 
 
-@pytest.mark.parametrize("folder", PATTERN_DIRS, ids=lambda p: p.name)
+@pytest.mark.parametrize("folder", WAVE_DIRS, ids=lambda p: p.name)
 class TestComponents:
     def _load(self, folder):
-        path = folder / "components.yml"
+        path = folder / COMPONENTS
         if not path.is_file():
             statuses = _inventory_statuses(folder.name)
             assert not statuses & REQUIRED_FROM, \
@@ -50,7 +50,7 @@ class TestComponents:
 
     def test_structure(self, folder):
         cfg = self._load(folder)
-        assert cfg.get("pattern") == folder.name, "components.yml pattern must match the folder"
+        assert cfg.get("wave") == folder.name, "components.yml wave must match the folder"
         comps = cfg.get("components") or []
         assert comps, "components.yml lists no components"
         names = [c.get("name") for c in comps]
@@ -92,7 +92,7 @@ class TestComponents:
 
     def test_notebook_and_cell_exist(self, folder):
         comps = self._load(folder).get("components") or []
-        notebooks = {p.stem: p for p in pattern_notebooks(folder.name)}
+        notebooks = {p.stem: p for p in wave_notebooks(folder.name)}
         problems = []
         for c in comps:
             n, nb = c.get("name"), c.get("notebook")
@@ -111,7 +111,7 @@ class TestComponents:
         comps = self._load(folder).get("components") or []
         tracked = {(c.get("notebook"), c.get("cell")) for c in comps if c.get("mapping") == "manual"}
         missing = [
-            f"{nb.stem}: {cell['title']}" for nb in pattern_notebooks(folder.name)
+            f"{nb.stem}: {cell['title']}" for nb in wave_notebooks(folder.name)
             for cell in read_notebook(nb) if cell["title"].startswith("[REVIEW]")
             and (nb.stem, cell["title"]) not in tracked
         ]

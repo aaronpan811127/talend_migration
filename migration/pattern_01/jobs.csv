@@ -1,2 +1,0 @@
-talend_job,job_key,owner,status,notes
-ExampleOrdersLoad,pattern_01_example,aaron.pan@databricks.com,converting,reference implementation - replace with real Talend jobs

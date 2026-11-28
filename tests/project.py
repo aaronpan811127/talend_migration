@@ -17,12 +17,22 @@ NOTEBOOKS = ROOT / "notebooks"
 JOBS = ROOT / "resources" / "jobs"
 # Agent skills, where Claude harnesses (Claude Code, Omnigent Claude sessions) discover them; Genie Code adds this folder.
 SKILLS = ROOT / ".claude" / "skills"
-CONVENTIONS = SKILLS / "talend-pattern-migration" / "references" / "conventions.md"
-MIGRATION = ROOT / "migration"  # one migration/pattern_NN/ folder per pattern
-JOBS_CSV = "jobs.csv"  # per-pattern inventory: migration/pattern_NN/jobs.csv
+CONVENTIONS = SKILLS / "talend-wave-migration" / "references" / "conventions.md"
+MIGRATION = ROOT / "migration"  # one migration/wave_NN/ folder per wave
+# Wave folder layout (conventions.md, Wave folder); paths relative to migration/wave_NN/.
+SPEC = "spec.md"                              # design: scope, grouping, flow, parameters, Snowflake objects, decisions
+JOBS_CSV = "progress/jobs.csv"                # which Talend jobs are in the wave, owner and status
+CHECKPOINT = "progress/checkpoint.yml"        # hand-over state between sessions
+COMPONENTS = "progress/components.yml"        # status of every Talend component
+VALIDATION_YML = "validation/validation.yml"  # reconciliation rules
+VALIDATION_RESULTS = "validation/results.md"  # recorded results
+VALIDATION_REPORTS = "validation/reports"     # generated reports (optional)
+LEARNINGS = "learnings/learnings.md"          # what this wave taught us
+WAVE_SUBDIRS = ("inputs", "progress", "validation", "scripts", "learnings")
+PROGRESS_FILES = {"jobs.csv", "checkpoint.yml", "components.yml"}
 JOBS_CSV_FIELDS = ["talend_job", "job_key", "owner", "status", "notes"]
 
-PATTERN_RX = re.compile(r"^pattern_\d{2}$")
+WAVE_RX = re.compile(r"^wave_\d{2}$")
 SNAKE_RX = re.compile(r"^[a-z][a-z0-9_]*$")
 # Common job parameters and their required default (None = the job key).
 COMMON_PARAMS = {
@@ -55,34 +65,34 @@ def load_yaml(path):
         return yaml.safe_load(fh) or {}
 
 
-# ---------- patterns and notebooks ----------
+# ---------- waves and notebooks ----------
 
-def pattern_dirs() -> list:
-    """migration/pattern_NN/ folders."""
+def wave_dirs() -> list:
+    """migration/wave_NN/ folders."""
     if not MIGRATION.is_dir():
         return []
-    return sorted(p for p in MIGRATION.iterdir() if p.is_dir() and PATTERN_RX.match(p.name))
+    return sorted(p for p in MIGRATION.iterdir() if p.is_dir() and WAVE_RX.match(p.name))
 
 
 def inventory_rows() -> list:
-    """All rows of every migration/pattern_NN/jobs.csv, each with `pattern` and `source` (file:line) added."""
+    """All rows of every migration/wave_NN/progress/jobs.csv, each with `wave` and `source` (file:line) added."""
     rows = []
-    for folder in pattern_dirs():
+    for folder in wave_dirs():
         path = folder / JOBS_CSV
         if path.is_file():
             with open(path, newline="") as fh:
                 for i, r in enumerate(csv.DictReader(fh), 2):
-                    rows.append({**r, "pattern": folder.name, "source": f"{rel(path)}:{i}"})
+                    rows.append({**r, "wave": folder.name, "source": f"{rel(path)}:{i}"})
     return rows
 
 
-def pattern_ids() -> list:
-    """Pattern ids that have a notebook folder, a migration folder or a job file."""
+def wave_ids() -> list:
+    """Wave ids that have a notebook folder, a migration folder or a job file."""
     ids = set()
     for base in (NOTEBOOKS, MIGRATION):
         if base.is_dir():
-            ids |= {p.name for p in base.iterdir() if p.is_dir() and PATTERN_RX.match(p.name)}
-    ids |= {job_pattern(f) for f in job_files() if job_pattern(f)}
+            ids |= {p.name for p in base.iterdir() if p.is_dir() and WAVE_RX.match(p.name)}
+    ids |= {job_wave(f) for f in job_files() if job_wave(f)}
     return sorted(ids)
 
 
@@ -99,17 +109,17 @@ def notebooks_in(folder: Path) -> list:
     return sorted(p for p in folder.rglob("*") if p.is_file() and is_notebook(p)) if folder.is_dir() else []
 
 
-def pattern_notebooks(pattern: str) -> list:
-    return notebooks_in(NOTEBOOKS / pattern)
+def wave_notebooks(wave: str) -> list:
+    return notebooks_in(NOTEBOOKS / wave)
 
 
-def all_pattern_notebooks() -> list:
-    return [nb for pid in pattern_ids() for nb in pattern_notebooks(pid)]
+def all_wave_notebooks() -> list:
+    return [nb for pid in wave_ids() for nb in wave_notebooks(pid)]
 
 
-def pattern_modules(pattern: str) -> list:
-    """Plain Python helper modules (not notebooks) kept next to a pattern's notebooks."""
-    folder = NOTEBOOKS / pattern
+def wave_modules(wave: str) -> list:
+    """Plain Python helper modules (not notebooks) kept next to a wave's notebooks."""
+    folder = NOTEBOOKS / wave
     return sorted(p for p in folder.rglob("*.py") if not is_notebook(p)) if folder.is_dir() else []
 
 
@@ -185,8 +195,8 @@ def job_stem(path: Path) -> str:
     return name[: -len(".job.yml")] if name.endswith(".job.yml") else path.stem
 
 
-def job_pattern(path: Path):
-    m = re.match(r"^(pattern_\d{2})_", path.name)
+def job_wave(path: Path):
+    m = re.match(r"^(wave_\d{2})_", path.name)
     return m.group(1) if m else None
 
 
@@ -209,7 +219,7 @@ def resolve_notebook(job_file: Path, notebook_path: str):
 
 MAIN = "origin/main"
 _STAMP = r"(?P<stamp>\d{8}-\d{4})"  # branch creation time, UTC; several sessions may continue one branch
-MIGRATE_RX = re.compile(rf"^migrate/(?P<pattern>pattern_\d{{2}})/{_STAMP}$")
+MIGRATE_RX = re.compile(rf"^migrate/(?P<wave>wave_\d{{2}})/{_STAMP}$")
 SHARED_RX = re.compile(rf"^shared/(?P<topic>[a-z0-9][a-z0-9-]{{0,39}})/{_STAMP}$")
 
 

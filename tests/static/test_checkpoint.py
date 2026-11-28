@@ -1,16 +1,16 @@
-"""Static checks on migration/<pattern>/checkpoint.yml - the pattern's progress, shared by every session
-that works on its branch. Rules: .claude/skills/talend-pattern-migration/references/conventions.md#checkpoint
+"""Static checks on migration/<wave>/progress/checkpoint.yml - the wave's progress, shared by every session
+that works on its branch. Rules: .claude/skills/talend-wave-migration/references/conventions.md#checkpoint
 """
 import datetime
 import re
 
 import pytest
 
-from project import MAIN, current_branch, inventory_rows, load_yaml, parse_branch, pattern_dirs, shared_base, warn
+from project import CHECKPOINT, COMPONENTS, MAIN, current_branch, inventory_rows, load_yaml, parse_branch, wave_dirs, shared_base, warn
 
 STEPS = ["setup", "analyze", "spec", "convert", "job_yamls", "tests", "validate", "pr_review", "done"]
-FIELDS = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
-REQUIRED = {"pattern", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
+FIELDS = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "blocked_on", "sessions", "notes"}
+REQUIRED = {"wave", "branch", "depends_on", "prs", "step", "updated", "done", "next", "sessions"}
 # Session ids are kept so a later session can be resumed (claude --resume) or forked (omnigent run --fork).
 SESSION_IDS = ("omnigent_session_id", "claude_session_id")
 SESSION_REQUIRED = {*SESSION_IDS, "harness", "by", "at", "summary"}
@@ -20,26 +20,26 @@ TIME_FMT = "%Y-%m-%dT%H:%MZ"
 PR_RX = re.compile(r"^(#?\d+|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+)$")
 
 
-def _statuses(pattern):
-    return {r["status"] for r in inventory_rows() if r["pattern"] == pattern}
+def _statuses(wave):
+    return {r["status"] for r in inventory_rows() if r["wave"] == wave}
 
 
 def _load(folder):
-    path = folder / "checkpoint.yml"
+    path = folder / CHECKPOINT
     if not path.is_file():
         started = _statuses(folder.name) - {"not_started"}
         assert not started, f"checkpoint.yml is required once work has started (jobs.csv statuses: {sorted(started)})"
-        pytest.skip("no checkpoint.yml yet (pattern not started)")
+        pytest.skip("no checkpoint.yml yet (wave not started)")
     return load_yaml(path)
 
 
-@pytest.mark.parametrize("folder", pattern_dirs(), ids=lambda p: p.name)
+@pytest.mark.parametrize("folder", wave_dirs(), ids=lambda p: p.name)
 class TestCheckpoint:
     def test_fields(self, folder):
         cp = _load(folder)
         assert not (REQUIRED - set(cp)), f"missing fields {sorted(REQUIRED - set(cp))}"
         assert not (set(cp) - FIELDS), f"unknown fields {sorted(set(cp) - FIELDS)}"
-        assert cp["pattern"] == folder.name, "pattern must match the folder"
+        assert cp["wave"] == folder.name, "wave must match the folder"
         assert cp["step"] in STEPS, f"step must be one of {STEPS}"
         for key in ("done", "next", "blocked_on"):
             items = cp.get(key) or []
@@ -133,7 +133,7 @@ class TestCheckpoint:
 
     def test_blocked_on_components(self, folder):
         cp = _load(folder)
-        comps_path = folder / "components.yml"
+        comps_path = folder / COMPONENTS
         open_items = set()
         if comps_path.is_file():
             open_items = {c.get("name") for c in load_yaml(comps_path).get("components") or [] if c.get("status") == "needs_input"}
@@ -143,10 +143,10 @@ class TestCheckpoint:
             warn(f"{folder.name}: needs_input components not listed in checkpoint blocked_on: {missing}")
 
     def test_checkpoint_belongs_to_current_branch(self, folder):
-        """On a migration branch, its pattern's checkpoint must name that branch and the shared branch merged into it."""
+        """On a migration branch, its wave's checkpoint must name that branch and the shared branch merged into it."""
         branch = current_branch()
         m = parse_branch(branch) if branch else None
-        if not (m and branch.startswith("migrate/") and m.group("pattern") == folder.name):
+        if not (m and branch.startswith("migrate/") and m.group("wave") == folder.name):
             pytest.skip(f"not on a migrate/{folder.name}/... branch")
         cp = _load(folder)
         assert cp.get("branch") == branch, \

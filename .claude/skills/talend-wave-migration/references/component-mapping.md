@@ -1,6 +1,6 @@
 # Talend to Databricks mapping
 
-Starting guidance for converting by hand; reusable scripts in the skill's `scripts/` folder may automate parts of it ([Reusable scripts](conventions.md#reusable-scripts)). `MANUAL` means no standard mapping: the pattern owner decides and records it in the spec. When you work out a mapping for your pattern that others can reuse, add it here as a shared change.
+Starting guidance for converting by hand; reusable scripts in the skill's `scripts/` folder may automate parts of it ([Reusable scripts](conventions.md#reusable-scripts)). `MANUAL` means no standard mapping: the wave owner decides and records it in the spec. When you work out a mapping for your wave that others can reuse, add it here as a shared change.
 
 ## Components
 
@@ -34,7 +34,7 @@ Starting guidance for converting by hand; reusable scripts in the skill's `scrip
 | tFixedFlowInput, tRowGenerator | `spark.createDataFrame` |
 | tSetGlobalVar, globalMap | Python variables; across tasks `dbutils.jobs.taskValues` |
 | tContextLoad, context variables | Job parameters + widgets; secrets in secret scope |
-| tRunJob | Extra task with `depends_on` (same pattern) or `run_job_task` (other pattern) |
+| tRunJob | Extra task with `depends_on` (same wave) or `run_job_task` (other wave) |
 | tPrejob / tPostjob | First / last cells, or separate setup/teardown tasks |
 | tLoop, tFlowToIterate, tForeach | Python loop, or `for_each_task` for parallel iterations |
 | tParallelize | Parallel tasks in the job |

@@ -1,4 +1,4 @@
-# talend-pattern-migration scripts
+# talend-wave-migration scripts
 
 Reusable conversion scripts for this skill. Shared files: add or change them only on a `shared/<topic>/...` branch with its own PR.
 

@@ -1,16 +1,16 @@
-# One file per migrated Talend job. Copy this file for each job; tasks run the notebooks in notebooks/<pattern>/.
+# One file per migrated Talend job. Copy this file for each job; tasks run the notebooks in notebooks/<wave>/.
 resources:
   jobs:
-    pattern_01_example:
-      name: pattern_01_example
+    wave_01_example:
+      name: wave_01_example
       tags:
         source: talend
-        pattern: pattern_01
+        wave: wave_01
         talend_job: ExampleOrdersLoad
 
       parameters:
         - name: job_name
-          default: pattern_01_example
+          default: wave_01_example
         - name: src_path
           default: ${workspace.file_path}/src
         - name: catalog
@@ -34,12 +34,12 @@ resources:
       tasks:
         - task_key: extract_load
           notebook_task:
-            notebook_path: ../../notebooks/pattern_01/01_extract_load.ipynb
+            notebook_path: ../../notebooks/wave_01/01_extract_load.ipynb
         - task_key: transform
           depends_on:
             - task_key: extract_load
           notebook_task:
-            notebook_path: ../../notebooks/pattern_01/02_transform.ipynb
+            notebook_path: ../../notebooks/wave_01/02_transform.ipynb
 
       email_notifications:
         on_failure:

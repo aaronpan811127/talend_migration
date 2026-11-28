@@ -1,7 +1,7 @@
 """Data reconciliation between Talend output (expected) and Databricks output (actual).
 
-Used by the talend-migration-validation skill and notebooks/validate_pattern.
-Config format: see migration/<pattern>/validation.yml.
+Used by the talend-migration-validation skill and notebooks/validate_wave.
+Config format: see migration/<wave>/validation/validation.yml.
 """
 import json
 import re
@@ -194,6 +194,6 @@ def run_from_config(
         except Exception as exc:  # report and continue with the other checks
             results[check["name"]] = {"passed": False, "error": f"{type(exc).__name__}: {exc}"}
 
-    summary = {"pattern": cfg.get("pattern"), "passed": bool(results) and all(r["passed"] for r in results.values()), "checks": results}
+    summary = {"wave": cfg.get("wave"), "passed": bool(results) and all(r["passed"] for r in results.values()), "checks": results}
     print(json.dumps(summary, indent=2, default=str))
     return summary

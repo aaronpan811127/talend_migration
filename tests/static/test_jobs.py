@@ -4,12 +4,12 @@ import re
 import pytest
 
 from project import (
-    COMMON_PARAMS, NOTEBOOKS, SECRET_RX, SNAKE_RX, all_job_keys, job_files, job_pattern, job_stem, jobs_in,
+    COMMON_PARAMS, NOTEBOOKS, SECRET_RX, SNAKE_RX, all_job_keys, job_files, job_wave, job_stem, jobs_in,
     notebook_widgets, rel, resolve_notebook, warn,
 )
 
 FILES = job_files()
-FILE_RX = re.compile(r"^pattern_\d{2}_[a-z0-9_]+\.job\.yml$")
+FILE_RX = re.compile(r"^wave_\d{2}_[a-z0-9_]+\.job\.yml$")
 RUN_JOB_REF_RX = re.compile(r"^\$\{resources\.jobs\.([A-Za-z0-9_]+)\.id\}$")
 ALLOWED_TASK_TYPES = {"notebook_task", "run_job_task", "condition_task"}
 SNOWFLAKE_OBJECT_PARAM_RX = re.compile(r"^snowflake_.*(table|procedure|proc|sp)s?$|^snowflake_.*(table|procedure)_")
@@ -35,7 +35,7 @@ def _notebooks(path, job):
 @pytest.mark.parametrize("path", FILES, ids=rel)
 class TestJobFile:
     def test_file_name(self, path):
-        assert FILE_RX.match(path.name), "name must be pattern_NN_<talend_job_snake>.job.yml"
+        assert FILE_RX.match(path.name), "name must be wave_NN_<talend_job_snake>.job.yml"
 
     def test_single_job_named_like_file(self, path):
         key, job = _job(path)
@@ -45,7 +45,7 @@ class TestJobFile:
         _, job = _job(path)
         tags = job.get("tags") or {}
         assert tags.get("source") == "talend"
-        assert tags.get("pattern") == job_pattern(path), f"tag pattern must be {job_pattern(path)}"
+        assert tags.get("wave") == job_wave(path), f"tag wave must be {job_wave(path)}"
         assert tags.get("talend_job"), "tag talend_job (original Talend job name) is required"
 
     def test_common_parameters(self, path):
@@ -87,13 +87,13 @@ class TestJobFile:
             types = ALLOWED_TASK_TYPES.intersection(t) | {k for k in t if k.endswith("_task")}
             assert types and types <= ALLOWED_TASK_TYPES, f"task {t['task_key']}: use one of {sorted(ALLOWED_TASK_TYPES)}"
 
-    def test_notebooks_exist_in_pattern_folder(self, path):
+    def test_notebooks_exist_in_wave_folder(self, path):
         _, job = _job(path)
-        folder = (NOTEBOOKS / job_pattern(path)).resolve()
+        folder = (NOTEBOOKS / job_wave(path)).resolve()
         for nb in _notebooks(path, job):
             resolved = resolve_notebook(path, nb)
             assert resolved, f"notebook not found: {nb}"
-            assert resolved.is_relative_to(folder), f"{nb} must be inside notebooks/{job_pattern(path)}/"
+            assert resolved.is_relative_to(folder), f"{nb} must be inside notebooks/{job_wave(path)}/"
 
     def test_run_job_tasks_reference_bundle_jobs(self, path):
         _, job = _job(path)

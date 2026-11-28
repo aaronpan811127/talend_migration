@@ -1,10 +1,11 @@
 """Keep AGENTS.md (instructions for non-Genie agent harnesses) in sync with the repo."""
 import re
+from pathlib import Path
 
-from project import COMMON_PARAMS, CONVENTIONS, ROOT, SKILLS, pattern_dirs
+from project import COMMON_PARAMS, CONVENTIONS, ROOT, SKILLS, wave_dirs
 
 AGENTS = ROOT / "AGENTS.md"
-# Backticked repo paths, e.g. `.claude/skills/.../SKILL.md` or `notebooks/pattern_NN/`. pattern_NN is a placeholder.
+# Backticked repo paths, e.g. `.claude/skills/.../SKILL.md` or `notebooks/wave_NN/`. wave_NN is a placeholder.
 PATH_RX = re.compile(r"`((?:\.claude/skills|src|tests|notebooks|resources|migration)/[^`\s*<>]*|[A-Za-z_-]+\.(?:md|ini|txt|yml))`")
 
 
@@ -17,18 +18,22 @@ def test_claude_md_imports_agents_md():
     assert "@AGENTS.md" in (ROOT / "CLAUDE.md").read_text()
 
 
-# Per-pattern files named without a folder (e.g. `spec.md`); validation_results.md is created during validation.
-PATTERN_FILES_OPTIONAL = {"validation_results.md"}
+# Per-wave files named without a folder (e.g. `spec.md`); results.md is created during validation.
+WAVE_FILES_OPTIONAL = {"results.md"}
 
 
 def _exists(ref: str) -> bool:
     ref = ref.rstrip("/")
-    if "pattern_NN" in ref:  # placeholder: check the fixed part, e.g. notebooks/
-        ref = ref.split("pattern_NN")[0].rstrip("/")
+    if ref.startswith("migration/wave_NN/"):  # a file inside a wave folder: check it in every wave
+        inner = ref[len("migration/wave_NN/"):]
+        return Path(inner).name in WAVE_FILES_OPTIONAL or (
+            bool(wave_dirs()) and all((d / inner).exists() for d in wave_dirs()))
+    if "wave_NN" in ref:  # placeholder: check the fixed part, e.g. notebooks/
+        ref = ref.split("wave_NN")[0].rstrip("/")
     if (ROOT / ref).exists() or (ROOT / f"{ref}.ipynb").exists():
         return True
-    if "/" not in ref:  # bare file name: a root file, or a file in every pattern folder
-        return ref in PATTERN_FILES_OPTIONAL or (bool(pattern_dirs()) and all((d / ref).exists() for d in pattern_dirs()))
+    if "/" not in ref:  # bare file name: a root file, or a file somewhere in every wave folder
+        return ref in WAVE_FILES_OPTIONAL or (bool(wave_dirs()) and all(any(d.rglob(ref)) for d in wave_dirs()))
     return False
 
 
@@ -90,7 +95,7 @@ def test_skill_links_stay_inside_skills():
 # ---------- conventions.md is the single source; AGENTS.md and the skills link to it ----------
 
 LINK_RX = re.compile(r"conventions\.md#([A-Za-z0-9_-]+)")
-ENTRY_POINTS = [AGENTS, SKILLS / "talend-pattern-migration" / "SKILL.md"]
+ENTRY_POINTS = [AGENTS, SKILLS / "talend-wave-migration" / "SKILL.md"]
 # Sections every entry point must link, so agents and Genie Code reach the same procedures.
 CORE_SECTIONS = {"working-copy", "branches", "checkpoint", "decisions", "resuming-and-handing-over", "prs"}
 # Procedure text that belongs only in conventions.md - finding it in an entry point means it was copied back.
@@ -125,7 +130,7 @@ def _docs():
 
 
 def test_conventions_links_resolve():
-    """Every conventions.md#anchor link in docs, skills and pattern files points at a real heading."""
+    """Every conventions.md#anchor link in docs, skills and wave files points at a real heading."""
     anchors = _anchors(CONVENTIONS)
     broken = sorted({f"{p.relative_to(ROOT)} -> #{a}" for p in _docs() for a in LINK_RX.findall(p.read_text()) if a not in anchors})
     assert not broken, f"links to conventions.md sections that don't exist (renamed heading?): {broken}"
@@ -153,7 +158,7 @@ def test_procedures_not_copied_into_entry_points():
 def test_slug_matches_github():
     assert _slug("Resuming and handing over") == "resuming-and-handing-over"
     assert _slug("Ownership (avoids merge conflicts)") == "ownership-avoids-merge-conflicts"
-    assert _slug("Inventory (`migration/pattern_NN/jobs.csv`)") == "inventory-migrationpattern_nnjobscsv"
+    assert _slug("Inventory (`migration/wave_NN/progress/jobs.csv`)") == "inventory-migrationwave_nnprogressjobscsv"
 
 
 def test_names_the_snowflake_schema_parameter():

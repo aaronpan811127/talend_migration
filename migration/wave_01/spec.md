@@ -1,21 +1,22 @@
-# pattern_01: S3 to Snowflake with stored procedure
+# wave_01: S3 to Snowflake with stored procedure
 
 Owner: aaron.pan@databricks.com
-Status: converting (reference implementation)
 
-## Talend jobs in this family
+Design only: status is in `progress/`, validation in `validation/`, lessons in `learnings/`.
 
-* ExampleOrdersLoad (placeholder - replace with the real jobs)
+## Why these jobs are one wave
+
+Same job pattern: each job reads landed files from S3, bulk-loads a Snowflake staging table, then calls a stored procedure to transform it.
+
+## Talend jobs in this wave
+
+* ExampleOrdersLoad (placeholder - replace with the real jobs; the list with owner and status is `progress/jobs.csv`)
 
 ## Flow
 
 1. tFileInputDelimited / tS3Get - read landed files from `source_path`.
 2. tSnowflakeOutputBulkExec - load into `snowflake_stage_table` (overwrite).
 3. tSnowflakeRow (CALL) - call `snowflake_procedure(job_name)` to transform into the final tables.
-
-## Component mapping
-
-Tracked per component, with status and behaviour differences, in [components.yml](components.yml).
 
 ## Parameters
 
@@ -49,6 +50,6 @@ Choices later sessions and reviewers must not undo without asking. Newest last.
 
 ## Open questions
 
-* Replace the placeholder job with the real Talend jobs of this family and their exports.
-* Component-level questions live in `components.yml` (`status: needs_input`).
-* Does the body of `SP_TRANSFORM_ORDERS` hard-code `ETL.` table names? If so, the per-developer copies would still write shared tables; ask the Snowflake owner for a version that uses unqualified names or `CURRENT_SCHEMA()` (tracked in `components.yml`, tSnowflakeRow_1).
+* Replace the placeholder job with the real Talend jobs of this wave and their exports.
+* Component-level questions live in `progress/components.yml` (`status: needs_input`).
+* Does the body of `SP_TRANSFORM_ORDERS` hard-code `ETL.` table names? If so, the per-developer copies would still write shared tables; ask the Snowflake owner for a version that uses unqualified names or `CURRENT_SCHEMA()` (tracked in `progress/components.yml`, tSnowflakeRow_1).

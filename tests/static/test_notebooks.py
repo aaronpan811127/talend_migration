@@ -1,4 +1,4 @@
-"""Static checks on pattern notebooks (notebooks/pattern_NN/*). Rules: references/conventions.md.
+"""Static checks on wave notebooks (notebooks/wave_NN/*). Rules: references/conventions.md.
 
 Failures block review; `warn(...)` findings show in the pytest warnings summary.
 """
@@ -7,11 +7,11 @@ import re
 import pytest
 
 from project import (
-    COMMON_PARAMS, NOTEBOOKS, PATTERN_RX, SNAKE_RX, WIDGET_RX, all_pattern_notebooks, job_files, job_pattern,
-    notebook_python, pattern_notebooks, read_notebook, rel, warn,
+    COMMON_PARAMS, NOTEBOOKS, WAVE_RX, SNAKE_RX, WIDGET_RX, all_wave_notebooks, job_files, job_wave,
+    notebook_python, wave_notebooks, read_notebook, rel, warn,
 )
 
-NBS = all_pattern_notebooks()
+NBS = all_wave_notebooks()
 FSTRING_SQL_RX = re.compile(r"\b(execute|call_procedure|\.sql)\(\s*f[\"']")
 CONCAT_SQL_RX = re.compile(r"\b(execute|\.sql)\(\s*[\"'][^\"']*[\"']\s*(\+|%\s)")
 DIRECT_IO_RX = re.compile(
@@ -20,18 +20,18 @@ DIRECT_IO_RX = re.compile(
 LITERAL_LOCATION_RX = re.compile(r"[\"'](s3a?://[^\"']+|/Volumes/[^\"']+|abfss://[^\"']+|gs://[^\"']+)[\"']")
 
 
-def test_no_flat_pattern_notebooks():
-    flat = sorted(p.name for p in NOTEBOOKS.iterdir() if p.is_file() and PATTERN_RX.match(p.name.split(".")[0]))
-    assert not flat, f"pattern notebooks must live in notebooks/pattern_NN/, found {flat}"
+def test_no_flat_wave_notebooks():
+    flat = sorted(p.name for p in NOTEBOOKS.iterdir() if p.is_file() and WAVE_RX.match(p.name.split(".")[0]))
+    assert not flat, f"wave notebooks must live in notebooks/wave_NN/, found {flat}"
 
 
-@pytest.mark.parametrize("pattern", sorted({job_pattern(f) for f in job_files() if job_pattern(f)}))
-def test_pattern_with_jobs_has_notebook_folder(pattern):
-    assert pattern_notebooks(pattern), f"jobs exist for {pattern} but notebooks/{pattern}/ has no notebooks"
+@pytest.mark.parametrize("wave", sorted({job_wave(f) for f in job_files() if job_wave(f)}))
+def test_wave_with_jobs_has_notebook_folder(wave):
+    assert wave_notebooks(wave), f"jobs exist for {wave} but notebooks/{wave}/ has no notebooks"
 
 
 @pytest.mark.parametrize("path", NBS, ids=rel)
-class TestPatternNotebook:
+class TestWaveNotebook:
     def test_first_cell_is_markdown_overview(self, path):
         cells = read_notebook(path)
         assert cells and cells[0]["type"] == "markdown", "first cell must be the %md overview"
